@@ -1,0 +1,16 @@
+[project]
+name = "Decomposition-Umap"
+version = "0.1.0"
+description = "A Python module for pattern classification and anomaly detection using UMAP dimensionality reduction embedding on decomposed data using Constrained Diffusion"
+readme = "ReadMe.rst"
+authors = [
+    { name = "Guang-Xing Li", email = "ligx.ngc7293@gmail.com" }
+]
+license = { text = "GPLv3" }
+requires-python = ">=3.0"
+dependencies = [
+    "numpy>=1.00",
+    "umap-learn>=0.4.0"
+    # "emd-signal>=1.0.0"
+]
+

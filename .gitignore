@@ -1,7 +1,18 @@
+old
+data
+conversion
+todo_list.txt
+data_fast
+decomposition_umap
+examples_local
+example*py
+.DS_Store
+.gitignore
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
 
 # C extensions
 *.so
