@@ -8,6 +8,8 @@ examples_local
 example*py
 .DS_Store
 .gitignore
+plot*py
+*.png
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
