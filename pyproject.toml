@@ -14,3 +14,10 @@ dependencies = [
     # "emd-signal>=1.0.0"
 ]
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "Decomposition_Umap" = "src" }
+packages = ["Decomposition_Umap"]
