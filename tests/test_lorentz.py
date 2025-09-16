@@ -30,16 +30,11 @@ def generate_lorenz_timeseries(n_points=100000):
 
 def run_lorenz_cdd_umap_example():
     """
-    Runs the full workflow and returns the original data and UMAP embedding.
-    
-    Returns:
-        tuple: A tuple containing:
-            - lorenz_data (numpy.ndarray): The original 100,000-point time series.
-            - umap_x (numpy.ndarray): The x-component of the UMAP embedding.
-            - umap_y (numpy.ndarray): The y-component of the UMAP embedding.
+    Runs the full workflow and returns the data, UMAP embedding, the trained
+    class instance, and the full decomposition.
     """
     N_TOTAL_POINTS = 10000; TRAIN_FRACTION = 1
-    N_EMBED_POINTS_TO_PLOT = 10000; CDD_NUM_COMPONENTS = 12
+    N_EMBED_POINTS_TO_PLOT = 2000; CDD_NUM_COMPONENTS = 12
 
     lorenz_data = generate_lorenz_timeseries(n_points=N_TOTAL_POINTS)
     
@@ -55,51 +50,93 @@ def run_lorenz_cdd_umap_example():
         n_component=2,
         umap_n_neighbors=50,
         umap_min_dist=0.0,
-        verbose=True
+        verbose=True,
+        norm_func=None
     )
     
-    # Extract the full embedding for all 100,000 points
     umap_x = decomp_umap_instance.embed_map[0]
     umap_y = decomp_umap_instance.embed_map[1]
     
-    # --- Plotting Section ---
-    print(f"\nPlotting the first {N_EMBED_POINTS_TO_PLOT} points of the embedding...")
-    
-    # We only need to slice the arrays for plotting, not for returning
-    points_to_plot = np.vstack([umap_x[:N_EMBED_POINTS_TO_PLOT], umap_y[:N_EMBED_POINTS_TO_PLOT]]).T
-    
-    plt.figure(figsize=(12, 10))
-    time_colors = np.arange(N_EMBED_POINTS_TO_PLOT)
-    scatter = plt.scatter(points_to_plot[:, 0], points_to_plot[:, 1], s=10, c=time_colors, cmap='plasma')
-    plt.title(f"UMAP Embedding of Lorenz Attractor (Decomposed with CDD)", fontsize=16)
-    plt.xlabel("UMAP Component 1", fontsize=12); plt.ylabel("UMAP Component 2", fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.6)
-    cbar = plt.colorbar(scatter); cbar.set_label("Time Step Index", fontsize=12)
-    plt.show()
+    # This initial plot is now optional, as the final plot is more comprehensive.
+    # You can uncomment it if you still want to see the initial plot.
+    # print(f"\nPlotting the first {N_EMBED_POINTS_TO_PLOT} points of the embedding...")
+    # points_to_plot = np.vstack([umap_x[:N_EMBED_POINTS_TO_PLOT], umap_y[:N_EMBED_POINTS_TO_PLOT]]).T
+    # plt.figure(figsize=(12, 10))
+    # time_colors = np.arange(N_EMBED_POINTS_TO_PLOT)
+    # plt.scatter(points_to_plot[:, 0], points_to_plot[:, 1], s=10, c=time_colors, cmap='plasma')
+    # plt.title(f"UMAP Embedding of Lorenz Attractor (Initial Training)", fontsize=16)
+    # plt.xlabel("UMAP Component 1"); plt.ylabel("UMAP Component 2")
+    # plt.grid(True, linestyle='--', alpha=0.6)
+    # cbar = plt.colorbar(scatter); cbar.set_label("Time Step Index")
+    # plt.show()
 
-    # --- Return the full data arrays ---
-    return lorenz_data, umap_x, umap_y
+    return lorenz_data, umap_x, umap_y, decomp_umap_instance, decomposition
 
 
 if __name__ == "__main__":
-    # Run the main function and capture the results
-    lorenz_data, umap_x, umap_y = run_lorenz_cdd_umap_example()
+    lorenz_data, umap_x, umap_y, decomp_umap_instance, decomposition = run_lorenz_cdd_umap_example()
 
-    # --- Save the returned results to .npy files ---
     OUTPUT_DIR = "results"
-    print(f"\nSaving results to the '{OUTPUT_DIR}' directory...")
-    
-    # Create the output directory if it doesn't exist
+    print(f"\nSaving initial results to the '{OUTPUT_DIR}' directory...")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    # Define file paths
-    data_path = os.path.join(OUTPUT_DIR, 'lorenz_data.npy')
-    umap_x_path = os.path.join(OUTPUT_DIR, 'umap_x.npy')
-    umap_y_path = os.path.join(OUTPUT_DIR, 'umap_y.npy')
+    np.save(os.path.join(OUTPUT_DIR, 'lorenz_data.npy'), lorenz_data)
+    np.save(os.path.join(OUTPUT_DIR, 'umap_x.npy'), umap_x)
+    np.save(os.path.join(OUTPUT_DIR, 'umap_y.npy'), umap_y)
     
-    # Save the arrays
-    np.save(data_path, lorenz_data)
-    np.save(umap_x_path, umap_x)
-    np.save(umap_y_path, umap_y)
+    print(f"Successfully saved initial results.")
+
+    # --- TEST compute_new_embeddings on a new slice of data ---
+    N_TEST_POINTS = 2000
+    print(f"\n--- Testing compute_new_embeddings on the LAST {N_TEST_POINTS} points ---")
     
-    print(f"Successfully saved:\n- {data_path}\n- {umap_x_path}\n- {umap_y_path}")
+    decomposition_to_embed = decomposition[:, -N_TEST_POINTS:]
+    
+    new_embed_map = decomp_umap_instance.compute_new_embeddings(
+        new_decomposition=decomposition_to_embed
+    )
+
+    new_embed_x = new_embed_map[0]
+    new_embed_y = new_embed_map[1]
+    
+    print(f"\nSaving new embedding results with prefix 'new_embed_'...")
+    np.save(os.path.join(OUTPUT_DIR, 'new_embed_umap_x.npy'), new_embed_x)
+    np.save(os.path.join(OUTPUT_DIR, 'new_embed_umap_y.npy'), new_embed_y)
+    print(f"Successfully saved new embedding results.")
+
+    # --- PLOT BOTH EMBEDDINGS FOR VISUAL CONFIRMATION ---
+    print("\nPlotting original and new embeddings for visual confirmation...")
+    plt.figure(figsize=(12, 10))
+    
+    # 1. Plot the full original embedding using a colormap for time
+    time_colors = np.arange(len(umap_x))
+    plt.scatter(
+        umap_x, 
+        umap_y, 
+        s=5, 
+        c=time_colors, 
+        cmap='cividis', 
+        alpha=0.5, 
+        label='Original Full Embedding'
+    )
+    
+    # 2. Plot the newly projected points on top with a distinct color
+    new_points_to_plot = np.vstack([new_embed_x, new_embed_y]).T
+    plt.scatter(
+        new_points_to_plot[:, 0], 
+        new_points_to_plot[:, 1], 
+        s=20, 
+        c='red', 
+        edgecolor='black',
+        linewidth=0.5,
+        label=f'Newly Embedded Points (Last {N_TEST_POINTS})'
+    )
+    
+    plt.title("compute_new_embeddings Test: New vs. Original Embedding", fontsize=16)
+    plt.xlabel("UMAP Component 1", fontsize=12)
+    plt.ylabel("UMAP Component 2", fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    cbar = plt.colorbar()
+    cbar.set_label("Time Step Index (for Original Embedding)")
+    plt.show()
