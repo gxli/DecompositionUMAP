@@ -225,8 +225,8 @@ def generate_fractal_with_gaussian(
     num_gaussians=2,
     min_sigma=3,
     max_sigma=5,
-    min_amplitude=0.6,
-    max_amplitude=0.6,
+    min_amplitude=0.7,
+    max_amplitude=0.7,
     margin=0.15
 ):
     """

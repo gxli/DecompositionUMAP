@@ -3,13 +3,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-import sys
 import os
 
 # --- Import the required decomposition library ---
 import constrained_diffusion as cdd
 
 # --- Add parent directory to path to find the 'src' package ---
+import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- Import your package ---
