@@ -1,16 +1,21 @@
-======================================================
-Multiscale Decomposition with UMAP Projection
-======================================================
+===============================================================================================
+Decomposition-UMAP A general-purpose framework for pattern classification and anomaly detection
+===============================================================================================
 
-.. image:: https://img.shields.io/pypi/v/your-package-name.svg
-        :target: https://pypi.python.org/pypi/your-package-name
-.. image:: https://img.shields.io/travis/your-username/your-repo-name.svg
-        :target: https://travis-ci.org/your-username/your-repo-name
-.. image:: https://readthedocs.org/projects/your-package-name/badge/?version=latest
-        :target: https://your-package-name.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+.. image:: https://img.shields.io/pypi/v/my-awesome-package.svg
+        :target: https://pypi.python.org/pypi/my-awesome-package
 
-A Python module for performing dimensionality reduction on multi-dimensional data. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm.
+.. image:: https://img.shields.io/travis/johndoe/my-project.svg
+        :target: https://travis-ci.org/johndoe/my-project
+
+.. .. image:: https://readthedocs.org/projects/my-cool-docs/badge/?version=latest
+..         :target: https://my-cool-docs.readthedocs.io/en/latest/?badge=latest
+..         :alt: Documentation Status
+
+
+Decomposition-UMAP
+==================
+Decomposition-UMAP A general-purpose framework for pattern classification and anomaly detection. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm. 
 
 Abstract
 --------
@@ -21,13 +26,19 @@ Functionality
 -------------
 
 *   **Supported Decomposition Techniques**: Includes interfaces for several decomposition methods:
-    *   Component Decomposition (CDD)
-    *   Empirical Mode Decomposition (EMD)
-    *   Multiscale Morphological Decomposition (MSM)
-    *   Adaptive Multiscale Decomposition (AMD)
-*   **Optional Hilbert Transform**: Provides an option to apply the Hilbert transform to each decomposition component to compute the analytical signal's amplitude. This is applicable for 1D or 2D component data.
+
+    *   Constrained Diffusion Decomposition (CDD, recommended)
+    *   Adaptive Multiscale Decomposition (AMD, recommended)
+    *   Multiscale Median Decomposition (MSM)
+    *   Empirical Mode Decomposition (EMD, not recommended)
+    *  Wavelet Decomposition (WD, not recommended)
+
+..   *   **Optional Hilbert Transform**: Provides an option to apply the Hilbert transform to each decomposition component to compute the analytical signal's amplitude. This is applicable for 1D or 2D component data.
+
 *   **UMAP for Dimensionality Reduction**: Utilizes the UMAP algorithm to compute a low-dimensional embedding of the decomposed data.
 *   **Support for Custom Decomposition Functions**: Users can supply their own decomposition functions, provided they adhere to the specified interface.
+
+
 *   **Training on Data Subsets**: The UMAP model can be trained on a specified fraction of the data, which is useful for managing memory and computational costs with large datasets.
 *   **Serialization of Trained Models**: Trained UMAP models can be saved to disk using `pickle` and subsequently reloaded to transform new data, ensuring reproducible results.
 
