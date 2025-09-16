@@ -15,7 +15,7 @@ Decomposition-UMAP A general-purpose framework for pattern classification and an
 
 Decomposition-UMAP
 ==================
-Decomposition-UMAP A general-purpose framework for pattern classification and anomaly detection. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm. 
+Decomposition-UMAP is a general-purpose framework for pattern classification and anomaly detection. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm.
 
 Abstract
 --------
@@ -31,15 +31,16 @@ Functionality
     *   Adaptive Multiscale Decomposition (AMD, recommended)
     *   Multiscale Median Decomposition (MSM)
     *   Empirical Mode Decomposition (EMD, not recommended)
-    *  Wavelet Decomposition (WD, not recommended)
+    *   Wavelet Decomposition (WD, not recommended)
 
-..   *   **Optional Hilbert Transform**: Provides an option to apply the Hilbert transform to each decomposition component to compute the analytical signal's amplitude. This is applicable for 1D or 2D component data.
+.. *   **Optional Hilbert Transform**: Provides an option to apply the Hilbert transform to each decomposition component to compute the analytical signal's amplitude. This is applicable for 1D or 2D component data.
 
 *   **UMAP for Dimensionality Reduction**: Utilizes the UMAP algorithm to compute a low-dimensional embedding of the decomposed data.
+
 *   **Support for Custom Decomposition Functions**: Users can supply their own decomposition functions, provided they adhere to the specified interface.
 
-
 *   **Training on Data Subsets**: The UMAP model can be trained on a specified fraction of the data, which is useful for managing memory and computational costs with large datasets.
+
 *   **Serialization of Trained Models**: Trained UMAP models can be saved to disk using `pickle` and subsequently reloaded to transform new data, ensuring reproducible results.
 
 Installation
@@ -92,19 +93,19 @@ The principal function `decompose_and_embed` executes the full workflow. The fol
         pickle.dump(umap_model, f)
 
 
-### Application of the Hilbert Transform
+.. ### Application of the Hilbert Transform
 
-To base the UMAP embedding on the analytical amplitude of the components rather than their direct values, set the `use_hilbert_amplitude` parameter to `True`.
+.. To base the UMAP embedding on the analytical amplitude of the components rather than their direct values, set the `use_hilbert_amplitude` parameter to `True`.
 
-.. code-block:: python
+.. .. code-block:: python
 
-    embed_map_hilbert, _, _ = decompose_and_embed(
-        data,
-        decomposition_method='msm',
-        use_hilbert_amplitude=True,
-        n_component=2,
-        verbose=True
-    )
+..     embed_map_hilbert, _, _ = decompose_and_embed(
+..         data,
+..         decomposition_method='msm',
+..         use_hilbert_amplitude=True,
+..         n_component=2,
+..         verbose=True
+..     )
 
 
 ### Applying a Trained Model to New Data
@@ -183,7 +184,25 @@ Applies a pre-trained UMAP model to new data.
 
 **`DecompositionUMAP` class**
 
-A class that encapsulates the workflow state. The wrapper functions are the recommended interface, but this class can be instantiated for more granular control.
+A class that encapsulates the workflow state and manages the UMAP model persistence. The wrapper functions (`decompose_and_embed`, `decompose_with_existing_model`) are the recommended interfaces for general use.
+
+*   **`save_umap_model(filename)`**
+    Saves the trained `umap.UMAP` model instance to a file using Python's `pickle` serialization.
+
+    *   **Parameters**: `filename` (`str`) - Target path for the saved model file.
+
+*   **`load_umap_model(filename)`**
+    Loads a serialized `umap.UMAP` model from a specified file path, replacing the current instance's model.
+
+    *   **Parameters**: `filename` (`str`) - Path to the pickled UMAP model file.
+
+*   **`compute_new_embeddings(new_decomposition=None, new_original_data=None)`**
+    Calculates the UMAP projection for new data using the existing, trained UMAP model. If `new_decomposition` is omitted, the method uses the stored `decomposition_func` to process `new_original_data`.
+
+    *   **Parameters**:
+        *   `new_decomposition` (`numpy.ndarray`, optional) - New pre-computed decomposition components.
+        *   `new_original_data` (`numpy.ndarray`, optional) - New original data (required for thresholding and/or re-decomposition).
+    *   **Returns**: A list of arrays representing the new UMAP components, reshaped to the original data dimensions.
 
 Dependencies
 ------------
