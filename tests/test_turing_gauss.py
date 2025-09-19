@@ -75,9 +75,12 @@ plt.scatter(datax.flatten(), datay.flatten(), s=1, c='blue', alpha=0.5)
 
 plt.show()
 
-# Save datax and datay as .npy files with 'turing_' prefix
-np.save('turing_data.npy', data)
-np.save('turing_signal.npy', signal)
-np.save('turing_anomaly.npy', anomaly)
-np.save('turing_umap_x.npy', datax)
-np.save('turing_umap_y.npy', datay)
+# Define a prefix for saving files
+prefix = 'results/turing_'
+
+# Save datax and datay as .npy files with the specified prefix
+np.save(f'{prefix}data.npy', data)
+np.save(f'{prefix}signal.npy', signal)
+np.save(f'{prefix}anomaly.npy', anomaly)
+np.save(f'{prefix}umap_x.npy', datax)
+np.save(f'{prefix}umap_y.npy', datay)

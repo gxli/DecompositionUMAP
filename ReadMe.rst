@@ -1,17 +1,14 @@
 ===============================================================================================
-Decomposition-UMAP A general-purpose framework for pattern classification and anomaly detection
+Decomposition-UMAP: A framework for pattern classification and anomaly detection
 ===============================================================================================
 
-.. image:: https://img.shields.io/pypi/v/my-awesome-package.svg
-        :target: https://pypi.python.org/pypi/my-awesome-package
+.. image:: https://img.shields.io/pypi/v/decomposition-umap.svg
+        :target: https://pypi.python.org/pypi/decomposition-umap
+        :alt: PyPI Version
 
-.. image:: https://img.shields.io/travis/johndoe/my-project.svg
-        :target: https://travis-ci.org/johndoe/my-project
-
-.. .. image:: https://readthedocs.org/projects/my-cool-docs/badge/?version=latest
-..         :target: https://my-cool-docs.readthedocs.io/en/latest/?badge=latest
-..         :alt: Documentation Status
-
+.. image:: https://img.shields.io/travis/gxli/DecompositionUMAP.svg
+        :target: https://travis-ci.org/gxli/DecompositionUMAP
+        :alt: Build Status
 
 Decomposition-UMAP
 ==================
@@ -20,22 +17,25 @@ Decomposition-UMAP is a general-purpose framework for pattern classification and
 Abstract
 --------
 
-This software provides a structured implementation for analyzing numerical data by combining signal and image decomposition with manifold learning. The primary workflow involves decomposing an input dataset into a set of components, which serve as a high-dimensional feature vector for each point in the original data. Subsequently, the UMAP algorithm is employed to project these features into a lower-dimensional space. This process is designed to facilitate the analysis of data where features may be present across multiple scales or frequencies.
+This software provides a structured implementation for analyzing numerical data by combining signal and image decomposition with manifold learning. The primary workflow involves decomposing an input dataset into a set of components, which serve as a high-dimensional feature vector for each point in the original data. Subsequently, the UMAP algorithm is employed to project these features into a lower-dimensional space. This process is designed to facilitate the analysis of data where features may be present across multiple scales or frequencies, enabling the separation of structured signals from noise.
 
 Functionality
 -------------
 
 *   **Supported Decomposition Techniques**: Includes interfaces for several decomposition methods:
 
-    *   Constrained Diffusion Decomposition (CDD, recommended)
-    *   Adaptive Multiscale Decomposition (AMD, recommended)
+    *   Constrained Diffusion Decomposition (CDD)
+    
+    *   Adaptive Multiscale Decomposition (AMD)
+
     *   Multiscale Median Decomposition (MSM)
-    *   Empirical Mode Decomposition (EMD, not recommended)
-    *   Wavelet Decomposition (WD, not recommended)
+    
+    *   Empirical Mode Decomposition (EMD)
 
-.. *   **Optional Hilbert Transform**: Provides an option to apply the Hilbert transform to each decomposition component to compute the analytical signal's amplitude. This is applicable for 1D or 2D component data.
+*   **UMAP for Dimensionality Reduction**: Utilizes the `umap-learn` library to compute a low-dimensional embedding of the decomposed data, revealing the underlying data manifold.
 
-*   **UMAP for Dimensionality Reduction**: Utilizes the UMAP algorithm to compute a low-dimensional embedding of the decomposed data.
+*   **Flexible API**: Provides both high-level wrapper functions for ease of use and a core `DecompositionUMAP` class for more granular control over the workflow.
+
 
 *   **Support for Custom Decomposition Functions**: Users can supply their own decomposition functions, provided they adhere to the specified interface.
 
@@ -46,163 +46,182 @@ Functionality
 Installation
 ------------
 
-The required Python packages must be installed prior to use:
+The required Python packages must be installed prior to use. It is recommended to use a virtual environment.
 
 .. code-block:: bash
 
-    pip install numpy umap-learn scipy
+    pip install numpy umap-learn scipy matplotlib
 
-The Python module (`decomposition_umap.py`) can then be integrated into a project. The decomposition functions (`cdd_decomposition`, `emd_decomposition`, etc.) are presumed to be located in a module named `multiscale_decomposition` within the same project structure.
+The Python package can then be installed from the repository or integrated into a project. The decomposition functions (`cdd_decomposition`, etc.) are presumed to be located in a `multiscale_decomposition` module.
 
 Usage
 -----
+The following examples demonstrate the workflow using a synthetic 256x256 dataset composed of Gaussian blobs (signal) embedded in a pink noise background.
 
-### Primary Usage: Decomposing and Embedding Data
-
-The principal function `decompose_and_embed` executes the full workflow. The following example demonstrates its application to a 2D numpy array using Multiscale Morphological (MSM) decomposition.
+Data Generation
+~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
     import numpy as np
-    import pickle
-    from decomposition_umap import decompose_and_embed
+    # Assuming the package is structured under 'src' or installed
+    import src as decomposition_umap
 
-    # 1. Define a 2D input dataset.
-    data = np.random.rand(128, 128)
+    def generate_pink_noise(shape):
+        """Generates pink noise with a 1/f power spectrum."""
+        rows, cols = shape
+        u, v = np.fft.fftfreq(rows), np.fft.fftfreq(cols)
+        frequency_radius = np.sqrt(u[:, np.newaxis]**2 + v**2)
+        frequency_radius[0, 0] = 1.0
+        fft_white_noise = np.fft.fft2(np.random.randn(rows, cols))
+        fft_pink_noise = fft_white_noise / frequency_radius
+        pink_noise = np.real(np.fft.ifft2(fft_pink_noise))
+        return (pink_noise - pink_noise.mean()) / pink_noise.std()
 
-    # 2. Execute the decomposition and UMAP embedding.
-    #    - embed_map: A list of numpy arrays, one for each UMAP component.
-    #    - decomposition: The intermediate multiscale components from MSM.
-    #    - umap_model: The trained umap.UMAP object.
-    embed_map, decomposition, umap_model = decompose_and_embed(
-        data,
-        decomposition_method='msm',
-        msm_filter_sizes='auto',
-        n_component=2,
-        verbose=True
+    def add_gaussian_blobs(data, centers, sigmas, amplitudes):
+        """Adds Gaussian blobs to an existing data array."""
+        rows, cols = data.shape
+        x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+        signal = np.zeros_like(data, dtype=float)
+        for center, sigma, amp in zip(centers, sigmas, amplitudes):
+            cx, cy, sx, sy = *center, *sigma
+            signal += amp * np.exp(-(((x - cx)**2 / (2 * sx**2)) + ((y - cy)**2 / (2 * sy**2))))
+        return data + signal, signal
+
+    # Generate the 256x256 dataset
+    shape = (256, 256)
+    pink_noise = generate_pink_noise(shape)
+    data, signal_blobs = add_gaussian_blobs(
+        pink_noise,
+        centers=[(60, 80), (160, 180), (100, 200)],
+        sigmas=[(10, 10), (16, 8), (12, 12)],
+        amplitudes=[3.0, 2.5, 2.0],
     )
 
-    # The returned 'embed_map' contains the low-dimensional representation.
-    umap_component_1 = embed_map[0]
-    umap_component_2 = embed_map[1]
+Running the Pipeline
+~~~~~~~~~~~~~~~~~~~~
 
-    print(f"Dimensions of UMAP component 1: {umap_component_1.shape}")
+There are three primary ways to execute the workflow.
 
-    # 3. The trained model can be serialized for later use.
-    with open('umap_model.pkl', 'wb') as f:
-        pickle.dump(umap_model, f)
-
-
-.. ### Application of the Hilbert Transform
-
-.. To base the UMAP embedding on the analytical amplitude of the components rather than their direct values, set the `use_hilbert_amplitude` parameter to `True`.
-
-.. .. code-block:: python
-
-..     embed_map_hilbert, _, _ = decompose_and_embed(
-..         data,
-..         decomposition_method='msm',
-..         use_hilbert_amplitude=True,
-..         n_component=2,
-..         verbose=True
-..     )
-
-
-### Applying a Trained Model to New Data
-
-The `decompose_with_existing_model` function applies a previously trained model to new data. This ensures that the decomposition and projection are performed in a manner consistent with the original model training.
+**Example A: High-Level API (Recommended)**
 
 .. code-block:: python
 
-    from decomposition_umap import decompose_with_existing_model
-
-    # 1. Define a new dataset with dimensions compatible with the trained model.
-    new_data = np.random.rand(128, 128)
-    model_filename = 'umap_model.pkl'
-
-    # 2. Apply the serialized model to the new data.
-    #    The same decomposition method and parameters used for training
-    #    must be specified to ensure a valid transformation.
-    new_embed_map, new_decomposition = decompose_with_existing_model(
-        model_filename=model_filename,
-        data=new_data,
-        decomposition_method='msm',
-        msm_filter_sizes='auto',
-        verbose=True
+    embed_map, decomposition, umap_model = decomposition_umap.decompose_and_embed(
+        data,
+        decomposition_method='cdd',
+        decomposition_max_n=6,
+        n_component=2,
+        verbose=True,
     )
 
-    print(f"Dimensions of new UMAP component 1: {new_embed_map[0].shape}")
-
-
-### Integration of Custom Decomposition Functions
-
-Users may provide a custom function for the decomposition stage. The function must accept a `numpy.ndarray` as input and return a `numpy.ndarray` with the shape `(n_components, ...data_shape)`.
+**Example B: Using the `DecompositionUMAP` Class Directly**
 
 .. code-block:: python
 
-    from scipy.ndimage import gaussian_filter
+    decomposition_func = lambda d: decomposition_umap.multiscale_decomposition.cdd_decomposition(d, max_n=6)
 
-    def custom_decomposition(data):
-        """A simple decomposition based on Gaussian filtering."""
-        comp1 = gaussian_filter(data, sigma=2)
-        comp2 = data - comp1
-        return np.array([comp1, comp2])
-
-    # Employ the custom function within the standard workflow.
-    embed_map_custom, _, _ = decompose_and_embed(
-        data,
-        decomposition_func=custom_decomposition,
+    pipeline_instance = decomposition_umap.DecompositionUMAP(
+        original_data=data,
+        decomposition_func=decomposition_func,
         n_component=2,
-        verbose=True
+        verbose=True,
     )
+
+**Example C: Using a Pre-computed Decomposition**
+
+.. code-block:: python
+
+    precomputed_decomposition, _ = decomposition_umap.multiscale_decomposition.cdd_decomposition(data, max_n=6)
+
+    pipeline_precomputed = decomposition_umap.DecompositionUMAP(
+        decomposition=precomputed_decomposition,
+        n_component=2,
+        verbose=True,
+    )
+
+Saving and Visualizing Results
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import os
+    import matplotlib.pyplot as plt
+
+    # Save the results to .npy files
+    output_dir = "results"
+    os.makedirs(output_dir, exist_ok=True)
+    np.save(os.path.join(output_dir, "decomposition.npy"), decomposition)
+    np.save(os.path.join(output_dir, "embed_map.npy"), np.array(embed_map))
+    
+    # Example Visualization...
 
 API Reference
 -------------
 
 **`decompose_and_embed(...)`**
 
-Performs decomposition and trains a new UMAP model.
+Performs decomposition on raw data and trains a new UMAP model in a single step.
 
-*   **Parameters**:
-    *   `data` (`numpy.ndarray`): Input data array.
-    *   `decomposition_method` (`str`): The name of the built-in decomposition method.
-    *   `decomposition_func` (`callable`): A user-provided decomposition function.
-    *   `use_hilbert_amplitude` (`bool`): If True, applies the Hilbert transform to components.
-    *   `n_component` (`int`): The target dimension for the UMAP embedding.
-    *   Other keyword arguments for UMAP and the selected decomposition method.
-*   **Returns**: A tuple containing the list of UMAP component arrays, the decomposition result, and the trained `umap.UMAP` model.
+*   **Key Parameters**:
+
+    *   `data` (`numpy.ndarray`): The input data array to be processed.
+
+    *   `decomposition_method` (`str`): The name of the built-in decomposition method (e.g., `'cdd'`).
+
+    *   `decomposition_func` (`callable`, optional): A user-provided custom function for decomposition.
+
+    *   `decomposition_max_n` (`int`, optional): Controls the number of components for relevant methods.
+
+    *   `n_component` (`int`): The target dimension for the final UMAP embedding.
+
+    *   `norm_func` (`callable`, optional): Function to normalize feature vectors. Defaults to `None`.
+
+*   **Returns**: A tuple `(embed_map, decomposition, umap_model)`.
 
 **`decompose_with_existing_model(...)`**
 
 Applies a pre-trained UMAP model to new data.
 
-*   **Parameters**:
-    *   `model_filename` (`str`): Path to the serialized UMAP model file.
-    *   `data` (`numpy.ndarray`): The new data array to transform.
-    *   Decomposition parameters must match those used during model training.
-*   **Returns**: A tuple containing the list of new UMAP component arrays and the new decomposition result.
+*   **Key Parameters**:
+
+    *   `model_filename` (`str`): Path to the pickled UMAP model file.
+
+    *   `data` (`numpy.ndarray`): The new raw data array to transform.
+
+    *   Decomposition parameters **must match** those used during model training.
+    
+*   **Returns**: A tuple `(embed_map, final_decomposition)`.
+
 
 **`DecompositionUMAP` class**
 
-A class that encapsulates the workflow state and manages the UMAP model persistence. The wrapper functions (`decompose_and_embed`, `decompose_with_existing_model`) are the recommended interfaces for general use.
+The core class that encapsulates the workflow state. It offers more granular control over the process.
 
-*   **`save_umap_model(filename)`**
-    Saves the trained `umap.UMAP` model instance to a file using Python's `pickle` serialization.
+*   **Initialization Options**:
+    The class is initialized in one of two ways:
 
-    *   **Parameters**: `filename` (`str`) - Target path for the saved model file.
+    1.  **With Raw Data for Training**: Provide ``original_data`` and a ``decomposition_func``.
 
-*   **`load_umap_model(filename)`**
-    Loads a serialized `umap.UMAP` model from a specified file path, replacing the current instance's model.
+        .. code-block:: python
 
-    *   **Parameters**: `filename` (`str`) - Path to the pickled UMAP model file.
+            instance = DecompositionUMAP(
+                original_data=my_data,
+                decomposition_func=my_func,
+            )
 
-*   **`compute_new_embeddings(new_decomposition=None, new_original_data=None)`**
-    Calculates the UMAP projection for new data using the existing, trained UMAP model. If `new_decomposition` is omitted, the method uses the stored `decomposition_func` to process `new_original_data`.
+    2.  **With a Pre-computed Decomposition for Training**: Provide a ``decomposition`` that has already been computed.
 
-    *   **Parameters**:
-        *   `new_decomposition` (`numpy.ndarray`, optional) - New pre-computed decomposition components.
-        *   `new_original_data` (`numpy.ndarray`, optional) - New original data (required for thresholding and/or re-decomposition).
-    *   **Returns**: A list of arrays representing the new UMAP components, reshaped to the original data dimensions.
+        .. code-block:: python
+
+            instance = DecompositionUMAP(
+                decomposition=my_precomputed_decomposition,
+            )
+
+*   **Key Methods**:
+    *   `save_umap_model(filename)`: Saves the trained model to a file.
+    *   `load_umap_model(filename)`: Loads a serialized model from a file.
+    *   `compute_new_embeddings(...)`: Projects new data using the trained model.
 
 Dependencies
 ------------
@@ -210,13 +229,21 @@ Dependencies
 *   `numpy`
 *   `umap-learn`
 *   `scipy`
+*   `matplotlib` (for running visualization examples)
 
 Contributing
 ------------
 
-Contributions to the source code are welcome. Please submit pull requests or open issues through the project's repository for consideration.
+Contributions to the source code are welcome. Please feel free to fork the repository, make changes, and submit a pull request. For bugs or feature requests, please open an issue on the repository's GitHub page.
 
 License
 -------
 
 This software is distributed under the MIT License. Please refer to the `LICENSE` file for full details.
+
+Contact
+-------
+
+**Author**: Guang-Xiang Li
+**Email**: `guangxiangli@gmail.com`
+**GitHub**: `https://github.com/gxli`

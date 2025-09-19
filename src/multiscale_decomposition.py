@@ -287,7 +287,7 @@ def emd_decomposition(data, max_imf=-1):
     return emd.emd(data, max_imf=max_imf)
 
 
-def msm_decomposition(data, base_window=3, max_scale=3, spacing='power2'):
+def msm_decomposition(data, base_window=3, max_scale=5, spacing='power2'):
     """
     Perform multiscale median decomposition on n-dimensional data.
 
