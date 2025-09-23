@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 import os
 import sys
+# Import for the custom decomposition function example
+from scipy.ndimage import gaussian_filter
 
 # --- Add parent directory to path to find the 'src' package ---
 # This is a common pattern to make a local package (in a 'src' folder)
@@ -12,113 +13,79 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # --- Import the main package ---
 import src as decomposition_umap
 
-# --- Import a specific decomposition function for the pre-computed example ---
-# This is needed for Example 3 where we run the decomposition manually first.
+# --- Import the example data generator and a specific decomposition function ---
+from src import example as du_example
 from src.multiscale_decomposition import cdd_decomposition
 
 # ==============================================================================
-# --- 1. Data Generation Functions ---
-# These functions create a synthetic dataset for testing the UMAP workflow.
-# The goal is to create a known signal (Gaussian blobs) hidden in noise.
+# --- 1. Custom Decomposition Function ---
+# This function is kept locally in the test script to demonstrate how a user
+# would define and pass their own function to the library.
 # ==============================================================================
 
-def generate_pink_noise(shape):
-    """Generates pink noise with a 1/f power spectrum."""
-    rows, cols = shape
-    # Create a frequency grid
-    u, v = np.fft.fftfreq(rows), np.fft.fftfreq(cols)
-    frequency_radius = np.sqrt(u[:, np.newaxis]**2 + v**2)
-    frequency_radius[0, 0] = 1.0  # Avoid division by zero at the DC component
-    
-    # Generate white noise in the frequency domain and scale it by 1/f
-    fft_white_noise = np.fft.fft2(np.random.randn(rows, cols))
-    fft_pink_noise = fft_white_noise / frequency_radius
-    
-    # Transform back to the spatial domain and normalize
-    pink_noise = np.real(np.fft.ifft2(fft_pink_noise))
-    
-    return (pink_noise - pink_noise.mean()) / pink_noise.std()
-
-def add_gaussian_blobs(data, centers, sigmas, amplitudes):
-    """Adds Gaussian blobs (the "signal") to an existing data array (the "noise")."""
-    rows, cols = data.shape
-    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
-    
-    # Create a separate array to hold only the signal for later comparison
-    signal = np.zeros_like(data, dtype=float)
-    for center, sigma, amp in zip(centers, sigmas, amplitudes):
-        cx, cy, sx, sy = *center, *sigma
-        signal += amp * np.exp(-(((x - cx)**2 / (2 * sx**2)) + ((y - cy)**2 / (2 * sy**2))))
-        
-    # Return the combined data and the signal-only mask
-    return data + signal, signal
+def custom_gaussian_decomposition(data):
+    """
+    A simple custom decomposition function that separates data into two scales
+    using Gaussian filtering. This demonstrates the `decomposition_func` argument.
+    """
+    # Create a blurred component (large scale features)
+    blurred_component = gaussian_filter(data, sigma=5)
+    # Create a detail component (small scale features)
+    detail_component = data - blurred_component
+    # Stack them into the required shape: (n_components, height, width)
+    return np.array([blurred_component, detail_component])
 
 # ==============================================================================
 # --- 2. Plotting Functions ---
-# These functions visualize the input, intermediate steps, and final output
-# of the Decomposition-UMAP process.
+# These functions visualize the input, intermediate steps, and final output.
 # ==============================================================================
 
-def plot_original_data(title, data, noise, signal):
-    """Generates a figure showing the noise, the signal, and the combined data."""
+def plot_original_data(title, data, background, feature):
+    """Generates a figure showing the background, the feature/anomaly, and the combined data."""
     fig, axes = plt.subplots(1, 3, figsize=(21, 6))
-    im1 = axes[0].imshow(noise, cmap='gray', origin='lower'); axes[0].set_title('Pink Noise Background'); fig.colorbar(im1, ax=axes[0])
-    im2 = axes[1].imshow(signal, cmap='gray', origin='lower'); axes[1].set_title('Gaussian Blobs (Signal)'); fig.colorbar(im2, ax=axes[1])
-    im3 = axes[2].imshow(data, cmap='viridis', origin='lower'); axes[2].set_title('Final Data (Noise + Signal)'); fig.colorbar(im3, ax=axes[2])
+    im1 = axes[0].imshow(background, cmap='gray', origin='lower'); axes[0].set_title('Background Signal'); fig.colorbar(im1, ax=axes[0])
+    im2 = axes[1].imshow(feature, cmap='gray', origin='lower'); axes[1].set_title('Anomaly / Feature'); fig.colorbar(im2, ax=axes[1])
+    im3 = axes[2].imshow(data, cmap='viridis', origin='lower'); axes[2].set_title('Final Combined Data'); fig.colorbar(im3, ax=axes[2])
     fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 def plot_decomposition_components(title, decomposition):
     """Generates a figure showing all decomposition components in a grid."""
     num_components = decomposition.shape[0]
-    # Calculate a pleasing grid shape for the subplots
     ncols = int(np.ceil(np.sqrt(num_components)))
     nrows = int(np.ceil(num_components / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4, nrows * 4))
-    axes = axes.flatten() # Flatten the 2D array of axes for easy iteration
-    
-    # Plot each component
+    axes = axes.flatten()
     for i in range(num_components):
         im = axes[i].imshow(decomposition[i], cmap='viridis', origin='lower'); axes[i].set_title(f'Component {i+1}'); fig.colorbar(im, ax=axes[i])
-    
-    # Hide any unused subplot axes if the number of components is not a perfect square
     for j in range(num_components, len(axes)):
         axes[j].axis('off')
-        
     fig.suptitle(title, fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-# MODIFIED: Function now accepts pink_noise and a highlight_factor
-def plot_umap_embedding_scatter(title, embed_map, signal_blobs, pink_noise, highlight_factor=1.0):
+# MODIFIED: Function now accepts the combined 'data' array for the new condition
+def plot_umap_embedding_scatter(title, embed_map, data, anomaly_mask, f_anomaly=0.1):
     """
-    Generates a scatter plot of the UMAP embedding, highlighting significant signal points.
-    
-    Args:
-        title (str): The main title for the plot.
-        embed_map (list): The list of UMAP component maps.
-        signal_blobs (np.ndarray): The array containing only the signal values.
-        pink_noise (np.ndarray): The array containing only the noise values.
-        highlight_factor (float): A multiplier to define "significant" signal.
-            A point is highlighted if its signal value is greater than its noise
-            value multiplied by this factor.
+    Generates a scatter plot of the UMAP embedding, highlighting anomaly points
+    based on the condition that the anomaly value is greater than the total data value.
     """
-    # Flatten the 2D embedding maps into 1D arrays for plotting
     umap_x, umap_y = embed_map[0].flatten(), embed_map[1].flatten()
     
-    # MODIFIED: The new logic for identifying significant signal points.
-    # A point is now considered "signal" only if its Gaussian blob value is
-    # greater than the underlying pink noise value times the factor.
-    is_signal = signal_blobs.flatten() > (pink_noise.flatten() * highlight_factor)
+    # MODIFIED: The new logic for identifying significant anomaly points.
+    # A point is highlighted only if its anomaly component value is strictly
+    # greater than the total data value (signal + anomaly) at that point.
+    # This implies the background signal must be negative.
+    is_highlighted = anomaly_mask.flatten() > data.flatten() * f_anomaly
     
-    # Separate the data into signal and noise sets
-    noise_x, noise_y = umap_x[~is_signal], umap_y[~is_signal]
-    signal_x, signal_y = umap_x[is_signal], umap_y[is_signal]
+    # Separate the data into background and highlighted sets
+    background_x, background_y = umap_x[~is_highlighted], umap_y[~is_highlighted]
+    highlight_x, highlight_y = umap_x[is_highlighted], umap_y[is_highlighted]
     
     plt.figure(figsize=(8, 8))
-    # Plot the noise points first with high transparency to show density
-    plt.scatter(noise_x, noise_y, label='Noise / Weak Signal', alpha=0.1, s=10, color='gray')
-    # Plot the significant signal points on top so they are clearly visible
-    plt.scatter(signal_x, signal_y, label=f'Significant Signal (Signal > Noise * {highlight_factor})', alpha=0.8, s=15, color='red')
+    # Plot the background points with high transparency
+    plt.scatter(background_x, background_y, label='Background', alpha=0.1, s=10, color='gray')
+    # Plot the highlighted points on top so they are clearly visible
+    plt.scatter(highlight_x, highlight_y, label='Highlighted (Anomaly > Data)', alpha=0.8, s=15, color='red')
     
     plt.title(title, fontsize=16)
     plt.xlabel('UMAP Dimension 1'); plt.ylabel('UMAP Dimension 2')
@@ -131,81 +98,70 @@ def plot_umap_embedding_scatter(title, embed_map, signal_blobs, pink_noise, high
 # ==============================================================================
 
 if __name__ == '__main__':
-    # --- Configuration ---
-    # Define a factor to determine what counts as a "significant" signal for plotting.
-    # A factor of 2.0 means we only highlight points where the signal is at least
-    # twice as strong as the background noise.
-    HIGHLIGHT_FACTOR = 2.0
-
     # --- Generate a common dataset for all examples ---
-    print("--- Generating synthetic data: Gaussian blobs in pink noise ---")
-    shape = (256, 256)
-    pink_noise = generate_pink_noise(shape)
-    data, signal_blobs = add_gaussian_blobs(
-        pink_noise,
-        centers=[(60, 80), (160, 180), (100, 200)],
-        sigmas=[(5, 5), (2, 8), (2, 2)],
-        amplitudes=[5.0, 4.0, 3.0]
-    )
+    print("--- Generating synthetic data: Gaussian anomaly in fractal noise ---")
+    data, signal, anomaly = du_example.generate_fractal_with_gaussian()
 
-    # --- Example 1: High-Level API `decompose_and_embed` ---
+    # --- Example 1: Standard Mode with a Built-in Decomposition Method ---
     # This is the simplest and most common way to use the library for training.
-    print("\n--- Running Example 1: High-level `decompose_and_embed` function ---")
+    print("\n--- Running Example 1: Standard Mode (`data` and `decomposition_method`) ---")
     embed_map, decomposition, umap_model = decomposition_umap.decompose_and_embed(
         data=data,
         decomposition_method='cdd',
         decomposition_max_n=6,
         n_component=2,
+        umap_params={'n_neighbors': 20, 'min_dist': 0.0},
         verbose=True
     )
 
-    # --- Save the results from the first example ---
-    print("\n--- Saving results to .npy files ---")
+    # --- Save and plot the results from Example 1 ---
+    print("\n--- Saving results from Example 1 ---")
     output_dir = "results"
     os.makedirs(output_dir, exist_ok=True)
-    np.save(os.path.join(output_dir, "original_data.npy"), data)
-    np.save(os.path.join(output_dir, "decomposition.npy"), decomposition)
-    np.save(os.path.join(output_dir, "embed_map_x.npy"), np.array(embed_map[0]))
-    np.save(os.path.join(output_dir, "embed_map_y.npy"), np.array(embed_map[1]))
-    print(f"Results saved in '{output_dir}/' directory.")
+    np.save(os.path.join(output_dir, "fractal_data.npy"), data)
+    np.save(os.path.join(output_dir, "fractal_decomposition.npy"), decomposition)
+    np.save(os.path.join(output_dir, "fractal_embed_map_x.npy"), embed_map[0])
+    np.save(os.path.join(output_dir, "fractal_embed_map_y.npy"), embed_map[1])
+    print(f"Results saved in '{output_dir}/'")
 
-    # --- Generate plots for the results from Example 1 ---
-    print("\n--- Generating plots ---")
-    plot_original_data('Input Data Components', data, pink_noise, signal_blobs)
-    plot_decomposition_components('Decomposition Components via CDD', decomposition)
-    # MODIFIED: Pass the pink_noise array and the factor to the plotting function
+    print("\n--- Generating plots for Example 1 ---")
+    plot_original_data('Input Data for All Examples', data, signal, anomaly)
+    plot_decomposition_components('Decomposition from Example 1', decomposition)
+    # MODIFIED: Pass the combined 'data' array to the plotting function
     plot_umap_embedding_scatter(
-        'UMAP Embedding with Significant Signal Highlighted',
+        'UMAP Embedding with Anomaly > Data Highlighted',
         embed_map,
-        signal_blobs,
-        pink_noise,
-        highlight_factor=HIGHLIGHT_FACTOR
+        data, # Pass the combined data for the new condition
+        anomaly
     )
-    
-    # --- Example 2: Using the `DecompositionUMAP` Class Directly ---
-    # This approach is useful if you want more control.
-    print("\n--- Running Example 2: Using the `DecompositionUMAP` class directly ---")
-    pipeline_instance = decomposition_umap.DecompositionUMAP(
-        original_data=data,
-        decomposition_method='cdd',
-        decomposition_max_n=6,
+
+    # --- Example 2: Using a Custom Decomposition Function ---
+    # This approach is for when you have your own specific method for separating features.
+    print("\n--- Running Example 2: Custom Decomposition Function Mode (`decomposition_func=...`) ---")
+    embed_map_custom, decomp_custom, _ = decomposition_umap.decompose_and_embed(
+        data=data,
+        decomposition_func=custom_gaussian_decomposition,
         n_component=2,
         verbose=True
     )
-    print("Example 2 finished. Results are numerically identical to Example 1.")
+    print("Example 2 finished. A plot for its custom decomposition could also be generated.")
 
-    # --- Example 3: Using a Pre-computed Decomposition with the Class ---
-    # This is efficient if your decomposition is slow.
-    print("\n--- Running Example 3: Using the `DecompositionUMAP` class with a pre-computed decomposition ---")
-    print("Pre-computing the decomposition...")
+    # --- Example 3: Using a Pre-computed Decomposition ---
+    # This is efficient if your decomposition is slow and you want to reuse it
+    # while experimenting with different UMAP parameters.
+    print("\n--- Running Example 3: Pre-computed Decomposition Mode (`decomposition=...`) ---")
+    # Step 1: Manually compute the decomposition first
+    print("Step 1: Pre-computing decomposition...")
     precomputed_decomposition, _ = cdd_decomposition(data, max_n=6)
     
-    pipeline_precomputed = decomposition_umap.DecompositionUMAP(
+    # Step 2: Pass the result directly to the function
+    print("\nStep 2: Passing pre-computed decomposition to the wrapper...")
+    embed_map_pre, _, _ = decomposition_umap.decompose_and_embed(
         decomposition=np.array(precomputed_decomposition),
         n_component=2,
-        verbose=True
+        verbose=True,
     )
-    print("Example 3 finished. Results are numerically identical to Example 1.")
+    print("Example 3 finished successfully.")
     
     # --- Display all created plot windows at the end of the script ---
     print("\n--- Displaying all plots. ---")
