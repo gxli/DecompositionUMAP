@@ -48,14 +48,14 @@ def plot_images(p, figsize_per_subplot=3):
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
-    plt.show()
+    # plt.show()
  
 data, signal, anomaly =decomposition_umap.example.generate_fractal_with_gaussian()
 plt.figure()
 plt.imshow(data, cmap='gray')
-plt.show()
+# plt.show()
 # embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data,decomposition_method='msm')
-embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data, decomposition_method='cdd',norm_func=None, n_component=2, umap_n_neighbors=15, verbose=True)
+embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data, decomposition_method='cdd',norm_func=None, n_component=2, umap_n_neighbors=15, verbose=True, decomposition_max_n =6)
 
 datax = embedding[0]
 

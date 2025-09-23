@@ -86,3 +86,5 @@ prefix = './results/'
 np.save(prefix + 'stock_embed_x.npy', x)
 np.save(prefix + 'stock_embed_y.npy', y)
 np.save(prefix + 'stock_data.npy', data)
+
+plt.show()

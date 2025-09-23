@@ -49,7 +49,7 @@ def plot_images(p, figsize_per_subplot=3):
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 
@@ -57,10 +57,10 @@ data, signal, anomaly =decomposition_umap.example.generate_turing_with_gaussian(
 
 plt.figure()
 plt.imshow(data, cmap='gray')
-plt.show()
+# plt.show()
 # embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data)
 
-embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data,decomposition_method='amd')
+embedding, decomposition, umap_obj = decomposition_umap.decompose_and_embed(data,decomposition_method='cdd')
 
 datax = embedding[0]
 
