@@ -2,13 +2,13 @@
 Decomposition-UMAP: A framework for pattern classification and anomaly detection
 ===============================================================================================
 
-.. image:: https://img.shields.io/pypi/v/decomposition-umap.svg
-        :target: https://pypi.python.org/pypi/decomposition-umap
-        :alt: PyPI Version
+.. .. image:: https://img.shields.io/pypi/v/decomposition-umap.svg
+..         :target: https://pypi.python.org/pypi/decomposition-umap
+..         :alt: PyPI Version
 
-.. image:: https://img.shields.io/travis/gxli/DecompositionUMAP.svg
-        :target: https://travis-ci.org/gxli/DecompositionUMAP
-        :alt: Build Status
+.. .. image:: https://img.shields.io/travis/gxli/DecompositionUMAP.svg
+..         :target: https://travis-ci.org/gxli/DecompositionUMAP
+..         :alt: Build Status
 
 Decomposition-UMAP
 ==================
@@ -22,7 +22,8 @@ This software provides a structured implementation for analyzing numerical data 
 Functionality
 -------------
 
-*   **Flexible API with Explicit Modes**: Provides a high-level API that supports single datasets, batch processing, multi-channel data, and pre-computed decompositions.
+*   **Flexible API with Explicit Modes**: Provides a high-level API that
+    supports single datasets, single dataset with use-supplied decomposition function and pre-computed decompositions.
 *   **Powerful Decomposition Techniques**: Includes interfaces for methods like Constrained Diffusion Decomposition (CDD) and Empirical Mode Decomposition (EMD).
 *   **Full UMAP Control**: Allows for complete control over the UMAP algorithm's parameters via convenience arguments and a flexible dictionary (`umap_params`).
 *   **Support for Custom Functions**: Users can supply their own decomposition functions for maximum extensibility.
@@ -37,8 +38,28 @@ The required Python packages must be installed prior to use. It is recommended t
 
     pip install numpy umap-learn scipy matplotlib
 
-The Python package can then be installed or integrated into a project. The decomposition functions (`cdd_decomposition`, etc.) are presumed to be located in a `multiscale_decomposition` module.
+and install 
 
+Decomposition-UMAP via pip:
+
+.. code-block:: bash
+
+    pip install decomposition-umap
+
+or clone the repository and install it manually:
+
+.. code-block:: bash
+
+    git clone https://github.com/gxli/DecompositionUMAP.git
+    cd DecompositionUMAP
+    pip install .
+
+
+
+Usage
+-----
+
+The following examples demonstrate the core workflows using a synthetic 256x256 dataset composed of a Gaussian anomaly embedded in a fractal noise background.
 Usage
 -----
 
@@ -47,13 +68,14 @@ The following examples demonstrate the core workflows using a synthetic 256x256 
 1. Data Generation
 ~~~~~~~~~~~~~~~~~~
 
-First, we generate the data. This function is assumed to be available in an `example` module within the library.
+First, we generate the data. This function is assumed to be available in an `example` module within the library. After installing your package, you can import it as shown below.
 
 .. code-block:: python
 
     import numpy as np
-    import src as decomposition_umap
-    from src import example as du_example
+    # Import the library and the example data generator
+    import decomposition_umap
+    from decomposition_umap import example as du_example
 
     # Generate a dataset with a known anomaly
     data, signal, anomaly = du_example.generate_fractal_with_gaussian()
@@ -66,6 +88,8 @@ First, we generate the data. This function is assumed to be available in an `exa
 This is the most common use case for training a new model.
 
 .. code-block:: python
+
+    import pickle
 
     embed_map, decomposition, umap_model = decomposition_umap.decompose_and_embed(
         data=data,
@@ -105,7 +129,7 @@ This is efficient if your decomposition is slow and you want to reuse it while t
 
 .. code-block:: python
 
-    from src.multiscale_decomposition import cdd_decomposition
+    from decomposition_umap.multiscale_decomposition import cdd_decomposition
 
     # Manually run the decomposition first
     precomputed, _ = cdd_decomposition(data, max_n=6)
@@ -175,21 +199,23 @@ The primary function for **training** a new Decomposition-UMAP model. It intelli
 
 *   **Operating Modes (provide exactly one)**:
 
-    *   `data`: For a single raw dataset.
+    *   `data` (`numpy.ndarray`): For a single raw dataset.
 
-    *   `datasets`: For a batch of raw datasets.
-
-    *   `data_multivariate`: For a multi-channel raw dataset.
-
-    *   `decomposition`: For a single pre-computed decomposition.
+    *   `decomposition` (`numpy.ndarray`): For a single pre-computed decomposition.
 
 *   **Key Parameters**:
 
     *   `decomposition_method` (`str`): The name of the built-in decomposition method (e.g., `'cdd'`).
 
-    *   `decomposition_func` (`callable`): A user-provided decomposition function.
+    *   `decomposition_max_n` (`int`): The number of components to generate for relevant decomposition methods.
+
+    *   `decomposition_func` (`callable`): A user-provided decomposition function, which overrides `decomposition_method`.
 
     *   `n_component` (`int`): The target dimension for the final UMAP embedding.
+
+    *   `norm_func` (`callable`): A function to normalize feature vectors before UMAP (e.g., `max_norm`).
+
+    *   `threshold` (`float`): A value below which data points are masked and excluded from analysis.
 
     *   `umap_n_neighbors` (`int`): Convenience argument for UMAP's `n_neighbors`.
 
@@ -197,16 +223,17 @@ The primary function for **training** a new Decomposition-UMAP model. It intelli
 
     *   `umap_params` (`dict`): For advanced control, a dictionary of arguments passed directly to the `umap.UMAP` constructor.
 
-*   **Returns**: A tuple whose contents depend on the operating mode. For single dataset modes, it returns `(embed_map, decomposition, umap_model)`.
-
+*   **Returns**: A tuple `(embed_map, decomposition, umap_model)`.
 
 **`decompose_with_existing_model(...)`**
 
-The primary function for **inference**. It applies a pre-trained UMAP model to new data, ensuring a consistent transformation. It does not require UMAP training parameters as they are loaded from the model file.
+The primary function for **inference**. It applies a pre-trained UMAP model to new data, ensuring a consistent transformation.
 
 *   **Operating Modes (provide exactly one)**:
 
-    *   `data`, `datasets`, `data_multivariate`, or `decomposition`.
+    *   `data` (`numpy.ndarray`): For a single raw dataset.
+
+    *   `decomposition` (`numpy.ndarray`): For a single pre-computed decomposition.
 
 *   **Key Parameters**:
 
@@ -214,22 +241,72 @@ The primary function for **inference**. It applies a pre-trained UMAP model to n
 
     *   `data` (`numpy.ndarray`): The new data array to transform.
 
-    *   Decomposition parameters (`decomposition_method`, etc.) **must match** those used during model training.
+    *   `decomposition_method` & `decomposition_max_n`: These decomposition parameters **must match** those used during model training to ensure a valid transformation.
 
-*   **Returns**: A tuple whose contents depend on the operating mode. For single dataset modes, it returns `(embed_map, final_decomposition)`.
+    *   `norm_func` (`callable`): The normalization function, which **must be consistent** with the one used during training.
+
+*   **Returns**: A tuple `(embed_map, final_decomposition)`.
 
 
 **`DecompositionUMAP` class**
 
-The core engine that encapsulates the workflow state. It offers granular control and can be initialized with raw data (using `decomposition_method` or `decomposition_func`) or a pre-computed `decomposition`.
+The core engine that encapsulates the workflow state. It offers granular control over the process and can be initialized with raw data or a pre-computed `decomposition`. When an instance is created, it immediately runs the full decomposition (if needed) and UMAP training pipeline. The resulting model and data are stored as attributes.
+
+*   **Initialization Options**:
+
+    The class is initialized in one of two ways:
+
+    1.  **With Raw Data**: Provide ``original_data`` and decomposition settings (like ``decomposition_method``). This is the standard training workflow.
+
+        .. code-block:: python
+
+            # Initialize by providing raw data and decomposition settings
+            instance = DecompositionUMAP(
+                original_data=data,
+                decomposition_method='cdd',
+                decomposition_max_n=6,
+                n_component=2
+            )
+            # instance.umap_model is now a trained model.
+
+    2.  **With a Pre-computed Decomposition**: Provide a ``decomposition``. This skips the decomposition step and is useful for reusing computationally expensive decompositions.
+
+        .. code-block:: python
+
+            # Initialize by providing a pre-computed decomposition
+            precomputed, _ = cdd_decomposition(data, max_n=6)
+            instance = DecompositionUMAP(
+                decomposition=np.array(precomputed),
+                n_component=2
+            )
 
 *   **Key Methods**:
 
-    *   `save_umap_model(filename)`: Saves the trained model to a file.
+    -   ``save_umap_model(filename)``: Saves the trained ``umap.UMAP`` model instance to a file using Python's `pickle` serialization. This allows for model persistence and later use in inference.
 
-    *   `load_umap_model(filename)`: Loads a serialized model from a file.
+        .. code-block:: python
 
-    *   `compute_new_embeddings(...)`: The core inference method that projects new data using the trained model.
+            # After training (e.g., from the first example above)
+            instance.save_umap_model("my_trained_model.pkl")
+
+    -   ``load_umap_model(filename)``: Loads a serialized ``umap.UMAP`` model from a specified file path, replacing the current instance's model. This is useful for specific workflows where you might want to swap models within an existing instance.
+
+        .. code-block:: python
+
+            # Create a minimal instance and load a model into it
+            inference_instance = DecompositionUMAP(decomposition=np.zeros((1, 1, 1)))
+            inference_instance.load_umap_model("my_trained_model.pkl")
+
+    -   ``compute_new_embeddings(...)``: The core inference method that projects new data using the instance's existing (trained or loaded) UMAP model. It takes either ``new_original_data`` (which it will decompose first) or a ``new_decomposition``.
+
+        .. code-block:: python
+
+            # Use the trained instance from the first example to transform new data
+            new_data, _, _ = du_example.generate_fractal_with_gaussian()
+            new_embedding = instance.compute_new_embeddings(
+                new_original_data=new_data
+            )
+
 
 
 Dependencies
@@ -254,5 +331,5 @@ Contact
 -------
 
 **Author**: Guang-Xiang Li
-**Email**: `guangxiangli@gmail.com`
+**Email**: `ligx.ngc7293@gmail.com`
 **GitHub**: `https://github.com/gxli`

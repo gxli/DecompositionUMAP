@@ -1,5 +1,5 @@
 [project]
-name = "Decomposition-Umap"
+name = "decomposition_umap"
 version = "0.1.0"
 description = "A Python module for pattern classification and anomaly detection using UMAP dimensionality reduction embedding on decomposed data using Constrained Diffusion"
 readme = "ReadMe.rst"
@@ -19,5 +19,5 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-package-dir = { "Decomposition_Umap" = "src" }
-packages = ["Decomposition_Umap"]
+package-dir = { "decomposition_umap" = "src" }
+packages = ["decomposition_umap"]

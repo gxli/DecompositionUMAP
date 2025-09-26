@@ -134,7 +134,7 @@ def adaptive_multiscale_decomposition(data, e_rel=3e-2, max_n=None, sm_mode='ref
             laplacian_ratio = laplacian_k / gradient_k
             # input("Press Enter to continue...")
             valid_points = laplacian_ratio > 1
-            print("valid points", np.sum(valid_points), "out of", data.size)
+            # print("valid points", np.sum(valid_points), "out of", data.size)
 
             DEBUG = False
             if DEBUG:

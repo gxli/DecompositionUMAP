@@ -32,6 +32,10 @@ class DecompositionUMAP:
     of the pipeline, including the decomposition components, the trained model,
     and all configuration parameters.
 
+    While this class can be used directly for fine-grained control, it is often
+    more convenient to use the high-level wrapper functions `decompose_and_embed`
+    for training and `decompose_with_existing_model` for inference.
+
     There are two primary ways to initialize this class:
     1.  **With Raw Data**: Provide `original_data`. You can either provide a specific
         `decomposition_func` or use the `decomposition_method` and
@@ -39,45 +43,122 @@ class DecompositionUMAP:
     2.  **With a Pre-computed Decomposition**: Provide a `decomposition`. The class
         will skip the decomposition step and proceed directly to UMAP training.
 
-    Args:
-        original_data (numpy.ndarray, optional): The input raw data. If provided,
-            a decomposition function will be run on it.
-        decomposition (numpy.ndarray, optional): A pre-computed decomposition.
-            This takes precedence over `original_data` if both are provided.
-        decomposition_func (callable, optional): A custom function that takes `original_data`
-            and returns its decomposition. This takes precedence over `decomposition_method`.
-        decomposition_method (str, optional): The name of a built-in decomposition
-            method (e.g., 'cdd', 'emd') to use if `original_data` is provided
-            without a `decomposition_func`. Defaults to 'cdd'.
-        decomposition_max_n (int, optional): The number of components to generate for
-            the selected `decomposition_method`. Defaults to None.
-        umap_n_neighbors (int, optional): The `n_neighbors` parameter for UMAP.
-            Defaults to 15. This is a convenience parameter; for more control,
-            use `umap_params`.
-        umap_min_dist (float, optional): The `min_dist` parameter for UMAP.
-            Defaults to 0.1. This is a convenience parameter.
-        low_memory (bool, optional): Sets the `low_memory` option in UMAP, which
-            trades speed for reduced memory usage. Defaults to False.
-        n_component (int, optional): The number of dimensions for the UMAP embedding.
-        threshold (float, optional): A value to mask low-signal regions. Requires
-            `original_data` to be effective.
-        norm_func (callable, optional): A function to normalize feature vectors.
-        use_hilbert_amplitude (bool, optional): If True, computes the analytic signal amplitude.
-        train_fraction (float, optional): Fraction of data to use for UMAP training.
-        train_mask (numpy.ndarray, optional): A boolean mask specifying training points.
-        verbose (bool, optional): If True, prints progress messages.
-        umap_params (dict, optional): For advanced use. A dictionary of keyword
-            arguments passed directly to the `umap.UMAP` constructor. If provided,
-            it will override settings like `umap_n_neighbors` and `low_memory`.
-            Example: `{'metric': 'cosine'}`.
+    Parameters
+    ----------
+    original_data : numpy.ndarray, optional
+        The input raw data. If provided, a decomposition function will be run on it.
+    decomposition : numpy.ndarray, optional
+        A pre-computed decomposition. This takes precedence over `original_data`.
+    decomposition_func : callable, optional
+        A custom function that takes `original_data` and returns its
+        decomposition. This takes precedence over `decomposition_method`.
+    decomposition_method : str, optional
+        The name of a built-in decomposition method (e.g., 'cdd', 'emd') to use
+        if `original_data` is provided without a `decomposition_func`.
+        Defaults to 'cdd'.
+    decomposition_max_n : int, optional
+        The number of components to generate for the selected `decomposition_method`.
+        Defaults to None.
+    umap_n_neighbors : int, optional
+        The `n_neighbors` parameter for UMAP. Defaults to 15. This is a
+        convenience parameter; for more control, use `umap_params`.
+    umap_min_dist : float, optional
+        The `min_dist` parameter for UMAP. Defaults to 0.1.
+    low_memory : bool, optional
+        Sets the `low_memory` option in UMAP, which trades speed for reduced
+        memory usage. Defaults to False.
+    n_component : int, optional
+        The number of dimensions for the UMAP embedding. Defaults to 2.
+    threshold : float, optional
+        A value to mask low-signal regions. Requires `original_data` to be effective.
+    norm_func : callable, optional
+        A function to normalize feature vectors before UMAP.
+    use_hilbert_amplitude : bool, optional
+        If True, computes the analytic signal amplitude for each component.
+        Defaults to False.
+    train_fraction : float, optional
+        Fraction of data (0.0 to 1.0) to use for UMAP training.
+    train_mask : numpy.ndarray, optional
+        A boolean mask specifying the exact points to use for training.
+    verbose : bool, optional
+        If True, prints progress messages. Defaults to True.
+    umap_params : dict, optional
+        For advanced use. A dictionary of keyword arguments passed directly to
+        the `umap.UMAP` constructor. If provided, it will override settings
+        like `umap_n_neighbors` and `low_memory`.
+        Example: `{'metric': 'cosine', 'random_state': 42}`.
 
-    Attributes:
-        decomposition (numpy.ndarray): The decomposition components of the input data.
-        original_shape (tuple): The shape of the original input data.
-        embed_map (list[np.ndarray]): The resulting list of UMAP embedding maps.
-        umap_model (umap.UMAP): The trained UMAP reducer instance.
-        decomposition_func (callable): The function used for decomposition. It will
-            be populated even if `decomposition_method` is used for initialization.
+    Attributes
+    ----------
+    decomposition : numpy.ndarray
+        The decomposition components of the input data.
+    original_shape : tuple
+        The shape of the original input data.
+    embed_map : list[numpy.ndarray]
+        The resulting list of UMAP embedding maps.
+    umap_model : umap.UMAP
+        The trained UMAP reducer instance.
+    decomposition_func : callable
+        The function used for decomposition. It will be populated even if
+        `decomposition_method` is used for initialization, making it available
+        for inference.
+
+    Examples
+    --------
+    First, let's set up some example data.
+
+    >>> from src import example as du_example
+    >>> data, signal, anomaly = du_example.generate_fractal_with_gaussian()
+
+    **1. Initialize with raw data and a built-in method:**
+
+    This is the most common way to use the class for training. It builds the
+    decomposition function for you.
+
+    >>> instance = DecompositionUMAP(
+    ...     original_data=data,
+    ...     decomposition_method='cdd',
+    ...     decomposition_max_n=6,
+    ...     n_component=2,
+    ...     verbose=False
+    ... )
+    >>> print(f"Embedding map shape: {instance.embed_map[0].shape}")
+    Embedding map shape: (256, 256)
+
+    **2. Initialize with a pre-computed decomposition:**
+
+    This is efficient if your decomposition is slow and you want to reuse it.
+
+    >>> from src.multiscale_decomposition import cdd_decomposition
+    >>> precomputed, _ = cdd_decomposition(data, max_n=6)
+    >>> precomputed_instance = DecompositionUMAP(
+    ...     decomposition=np.array(precomputed),
+    ...     n_component=2,
+    ...     verbose=False
+    ... )
+    >>> print(f"Pre-computed embedding map shape: {precomputed_instance.embed_map[0].shape}")
+    Pre-computed embedding map shape: (256, 256)
+
+    **3. Save, Load, and Perform Inference:**
+
+    Use the instance from Example 1 to save the model, then use its
+    `compute_new_embeddings` method to transform new data.
+
+    >>> # Save the trained model
+    >>> instance.save_umap_model("my_model.pkl")
+    [UMAP] Model saved to my_model.pkl
+
+    >>> # Generate new data for inference
+    >>> new_data, _, _ = du_example.generate_fractal_with_gaussian(anomaly_center=(200, 200))
+
+    >>> # Use the trained instance to compute embeddings for the new data
+    >>> new_embedding = instance.compute_new_embeddings(new_original_data=new_data)
+    >>> print(f"New embedding map shape: {new_embedding[0].shape}")
+    New embedding map shape: (256, 256)
+
+    The `load_umap_model` method is used to replace the model in an existing
+    instance, which is useful in specific scenarios. For general inference, the
+    `decompose_with_existing_model` wrapper is often more direct.
     """
     def __init__(self, original_data=None, decomposition=None, decomposition_func=None,
                  decomposition_method='cdd', decomposition_max_n=None,
