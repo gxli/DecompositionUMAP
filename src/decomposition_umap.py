@@ -32,10 +32,6 @@ class DecompositionUMAP:
     of the pipeline, including the decomposition components, the trained model,
     and all configuration parameters.
 
-    While this class can be used directly for fine-grained control, it is often
-    more convenient to use the high-level wrapper functions `decompose_and_embed`
-    for training and `decompose_with_existing_model` for inference.
-
     There are two primary ways to initialize this class:
     1.  **With Raw Data**: Provide `original_data`. You can either provide a specific
         `decomposition_func` or use the `decomposition_method` and
@@ -43,125 +39,50 @@ class DecompositionUMAP:
     2.  **With a Pre-computed Decomposition**: Provide a `decomposition`. The class
         will skip the decomposition step and proceed directly to UMAP training.
 
-    Parameters
-    ----------
-    original_data : numpy.ndarray, optional
-        The input raw data. If provided, a decomposition function will be run on it.
-    decomposition : numpy.ndarray, optional
-        A pre-computed decomposition. This takes precedence over `original_data`.
-    decomposition_func : callable, optional
-        A custom function that takes `original_data` and returns its
-        decomposition. This takes precedence over `decomposition_method`.
-    decomposition_method : str, optional
-        The name of a built-in decomposition method (e.g., 'cdd', 'emd') to use
-        if `original_data` is provided without a `decomposition_func`.
-        Defaults to 'cdd'.
-    decomposition_max_n : int, optional
-        The number of components to generate for the selected `decomposition_method`.
-        Defaults to None.
-    umap_n_neighbors : int, optional
-        The `n_neighbors` parameter for UMAP. Defaults to 15. This is a
-        convenience parameter; for more control, use `umap_params`.
-    umap_min_dist : float, optional
-        The `min_dist` parameter for UMAP. Defaults to 0.1.
-    low_memory : bool, optional
-        Sets the `low_memory` option in UMAP, which trades speed for reduced
-        memory usage. Defaults to False.
-    n_component : int, optional
-        The number of dimensions for the UMAP embedding. Defaults to 2.
-    threshold : float, optional
-        A value to mask low-signal regions. Requires `original_data` to be effective.
-    norm_func : callable, optional
-        A function to normalize feature vectors before UMAP.
-    use_hilbert_amplitude : bool, optional
-        If True, computes the analytic signal amplitude for each component.
-        Defaults to False.
-    train_fraction : float, optional
-        Fraction of data (0.0 to 1.0) to use for UMAP training.
-    train_mask : numpy.ndarray, optional
-        A boolean mask specifying the exact points to use for training.
-    verbose : bool, optional
-        If True, prints progress messages. Defaults to True.
-    umap_params : dict, optional
-        For advanced use. A dictionary of keyword arguments passed directly to
-        the `umap.UMAP` constructor. If provided, it will override settings
-        like `umap_n_neighbors` and `low_memory`.
-        Example: `{'metric': 'cosine', 'random_state': 42}`.
+    Args:
+        original_data (numpy.ndarray, optional): The input raw data. If provided,
+            a decomposition function will be run on it.
+        decomposition (numpy.ndarray, optional): A pre-computed decomposition.
+            This takes precedence over `original_data` if both are provided.
+        decomposition_func (callable, optional): A custom function that takes `original_data`
+            and returns its decomposition. This takes precedence over `decomposition_method`.
+        decomposition_method (str, optional): The name of a built-in decomposition
+            method (e.g., 'cdd', 'emd') to use if `original_data` is provided
+            without a `decomposition_func`. Defaults to 'cdd'.
+        decomposition_max_n (int, optional): The number of components to generate for
+            the selected `decomposition_method`. Defaults to None.
+        decomposition_log_base (float, optional): If provided, applies a logarithm
+            of this base to the data *before* decomposition. For example, use
+            `10` for log10 or `np.e` for the natural log. Handles non-positive
+            values by shifting the data. Defaults to None.
+        umap_n_neighbors (int, optional): The `n_neighbors` parameter for UMAP.
+            Defaults to 15. This is a convenience parameter; for more control,
+            use `umap_params`.
+        umap_min_dist (float, optional): The `min_dist` parameter for UMAP.
+            Defaults to 0.1. This is a convenience parameter.
+        low_memory (bool, optional): Sets the `low_memory` option in UMAP, which
+            trades speed for reduced memory usage. Defaults to False.
+        n_component (int, optional): The number of dimensions for the UMAP embedding.
+        threshold (float, optional): A value to mask low-signal regions. Requires
+            `original_data` to be effective.
+        norm_func (callable, optional): A function to normalize feature vectors.
+        use_hilbert_amplitude (bool, optional): If True, computes the analytic signal amplitude.
+        train_fraction (float, optional): Fraction of data to use for UMAP training.
+        train_mask (numpy.ndarray, optional): A boolean mask specifying training points.
+        verbose (bool, optional): If True, prints progress messages.
+        umap_params (dict, optional): For advanced use. A dictionary of keyword
+            arguments passed directly to the `umap.UMAP` constructor.
 
-    Attributes
-    ----------
-    decomposition : numpy.ndarray
-        The decomposition components of the input data.
-    original_shape : tuple
-        The shape of the original input data.
-    embed_map : list[numpy.ndarray]
-        The resulting list of UMAP embedding maps.
-    umap_model : umap.UMAP
-        The trained UMAP reducer instance.
-    decomposition_func : callable
-        The function used for decomposition. It will be populated even if
-        `decomposition_method` is used for initialization, making it available
-        for inference.
-
-    Examples
-    --------
-    First, let's set up some example data.
-
-    >>> from src import example as du_example
-    >>> data, signal, anomaly = du_example.generate_fractal_with_gaussian()
-
-    **1. Initialize with raw data and a built-in method:**
-
-    This is the most common way to use the class for training. It builds the
-    decomposition function for you.
-
-    >>> instance = DecompositionUMAP(
-    ...     original_data=data,
-    ...     decomposition_method='cdd',
-    ...     decomposition_max_n=6,
-    ...     n_component=2,
-    ...     verbose=False
-    ... )
-    >>> print(f"Embedding map shape: {instance.embed_map[0].shape}")
-    Embedding map shape: (256, 256)
-
-    **2. Initialize with a pre-computed decomposition:**
-
-    This is efficient if your decomposition is slow and you want to reuse it.
-
-    >>> from src.multiscale_decomposition import cdd_decomposition
-    >>> precomputed, _ = cdd_decomposition(data, max_n=6)
-    >>> precomputed_instance = DecompositionUMAP(
-    ...     decomposition=np.array(precomputed),
-    ...     n_component=2,
-    ...     verbose=False
-    ... )
-    >>> print(f"Pre-computed embedding map shape: {precomputed_instance.embed_map[0].shape}")
-    Pre-computed embedding map shape: (256, 256)
-
-    **3. Save, Load, and Perform Inference:**
-
-    Use the instance from Example 1 to save the model, then use its
-    `compute_new_embeddings` method to transform new data.
-
-    >>> # Save the trained model
-    >>> instance.save_umap_model("my_model.pkl")
-    [UMAP] Model saved to my_model.pkl
-
-    >>> # Generate new data for inference
-    >>> new_data, _, _ = du_example.generate_fractal_with_gaussian(anomaly_center=(200, 200))
-
-    >>> # Use the trained instance to compute embeddings for the new data
-    >>> new_embedding = instance.compute_new_embeddings(new_original_data=new_data)
-    >>> print(f"New embedding map shape: {new_embedding[0].shape}")
-    New embedding map shape: (256, 256)
-
-    The `load_umap_model` method is used to replace the model in an existing
-    instance, which is useful in specific scenarios. For general inference, the
-    `decompose_with_existing_model` wrapper is often more direct.
+    Attributes:
+        decomposition (numpy.ndarray): The decomposition components of the input data.
+        original_shape (tuple): The shape of the original input data.
+        embed_map (list[np.ndarray]): The resulting list of UMAP embedding maps.
+        umap_model (umap.UMAP): The trained UMAP reducer instance.
+        decomposition_func (callable): The final function used for decomposition,
+            which may include a log-transformation wrapper.
     """
     def __init__(self, original_data=None, decomposition=None, decomposition_func=None,
-                 decomposition_method='cdd', decomposition_max_n=None,
+                 decomposition_method='cdd', decomposition_max_n=None, decomposition_log_base=None,
                  umap_n_neighbors=15, umap_min_dist=0.1, low_memory=False,
                  n_component=2, threshold=None, norm_func=None,
                  use_hilbert_amplitude=False, train_fraction=None,
@@ -182,9 +103,10 @@ class DecompositionUMAP:
                 effective_original_data = original_data
         
         elif original_data is not None:
-            if final_decomp_func is None:
+            base_decomp_func = final_decomp_func
+            if base_decomp_func is None:
                 if verbose: print(f"[Init] Building decomposition function from method: '{decomposition_method}'")
-                def func(d):
+                def build_func(d):
                     if decomposition_method == 'cdd':
                         res = cdd_decomposition(d, max_n=decomposition_max_n)
                     elif decomposition_method == 'emd':
@@ -193,10 +115,25 @@ class DecompositionUMAP:
                     else:
                         raise ValueError(f"Unknown decomposition_method: {decomposition_method}")
                     return np.array(res[0] if isinstance(res, tuple) else res)
-                final_decomp_func = func
+                base_decomp_func = build_func
 
-            if not callable(final_decomp_func):
+            if not callable(base_decomp_func):
                 raise ValueError("Could not find or build a valid decomposition function.")
+
+            final_decomp_func = base_decomp_func
+            if decomposition_log_base is not None:
+                if verbose: print(f"[Init] Wrapping decomposition with log_base={decomposition_log_base}.")
+                def log_wrapper(d):
+                    min_val = np.min(d)
+                    if min_val <= 0:
+                        shift = -min_val + 1
+                        if verbose: print(f"  - Data shifted by {shift:.2f} to ensure all values are positive before log.")
+                        d_shifted = d + shift
+                    else:
+                        d_shifted = d
+                    log_data = np.log(d_shifted) / np.log(decomposition_log_base)
+                    return base_decomp_func(log_data)
+                final_decomp_func = log_wrapper
 
             if verbose: print("[Init] Decomposing original data...")
             self.decomposition = final_decomp_func(original_data)
@@ -211,7 +148,6 @@ class DecompositionUMAP:
         self.threshold = threshold
         self.verbose = verbose
 
-        # --- Intelligent Merging of UMAP Parameters ---
         final_umap_params = {
             'n_neighbors': umap_n_neighbors,
             'min_dist': umap_min_dist,
@@ -304,10 +240,11 @@ class DecompositionUMAP:
 
 def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomposition=None,
                         decomposition_method='cdd', decomposition_func=None,
+                        decomposition_log_base=None, decomposition_max_n=None,
                         norm_func=None, umap_n_neighbors=15, umap_min_dist=0.1, low_memory=False,
                         n_component=2, threshold=None, use_hilbert_amplitude=False,
                         train_fraction=None, train_mask=None, verbose=True,
-                        decomposition_max_n=None, umap_params=None):
+                        umap_params=None):
     """
     Performs decomposition and UMAP embedding using explicit, mutually exclusive modes.
 
@@ -325,18 +262,49 @@ def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomp
         data_multivariate (numpy.ndarray, optional): For **Multivariate Mode**.
         decomposition (numpy.ndarray, optional): For **Pre-computed Decomposition Mode**.
         decomposition_method (str, optional): The name of the decomposition method (e.g., 'cdd').
+        decomposition_func (callable, optional): A custom decomposition function.
+        decomposition_log_base (float, optional): If provided, applies a logarithm
+            of this base to the data *before* decomposition.
         decomposition_max_n (int, optional): Number of components for the decomposition.
+        norm_func (callable, optional): Function to normalize feature vectors.
         umap_n_neighbors (int, optional): The `n_neighbors` parameter for UMAP. Defaults to 15.
         umap_min_dist (float, optional): The `min_dist` parameter for UMAP. Defaults to 0.1.
         low_memory (bool, optional): Sets the `low_memory` option in UMAP. Defaults to False.
         n_component (int, optional): The target dimension for the UMAP embedding.
+        threshold (float, optional): A value to mask low-signal regions.
+        use_hilbert_amplitude (bool, optional): If True, applies Hilbert transform.
+        train_fraction (float, optional): Fraction of data for UMAP training.
+        train_mask (numpy.ndarray, optional): Mask specifying training data points.
+        verbose (bool, optional): If True, prints progress messages.
         umap_params (dict, optional): For advanced use. A dictionary of keyword
             arguments passed directly to `umap.UMAP`. Overrides other UMAP-specific
             arguments like `umap_n_neighbors` if there is a conflict.
-        (Other parameters are documented in previous responses).
 
-    Returns:
-        tuple: The results corresponding to the operating mode.
+    Returns
+    -------
+    tuple
+        The contents of the tuple depend on the operating mode:
+
+        - **For `data` or `decomposition` mode**:
+            - ``embed_map`` (*list[numpy.ndarray]*): A list of arrays, one for each
+              UMAP dimension, with the same shape as the original data.
+            - ``decomposition`` (*numpy.ndarray*): The decomposition components, with
+              shape `(n_components, ...original_shape)`.
+            - ``umap_model`` (*umap.UMAP*): The trained UMAP model instance.
+
+        - **For `datasets` mode**:
+            - ``list_of_embed_maps`` (*list[list[numpy.ndarray]]*): A list where each
+              item is an `embed_map` for a corresponding input dataset.
+            - ``list_of_decompositions`` (*list[numpy.ndarray]*): A list of the
+              decomposition components for each input dataset.
+            - ``umap_model`` (*umap.UMAP*): The single UMAP model trained on all datasets.
+
+        - **For `data_multivariate` mode**:
+            - ``embed_map`` (*list[numpy.ndarray]*): A single embedding map representing
+              the combined features of all channels.
+            - ``merged_decomposition`` (*numpy.ndarray*): The merged decomposition
+              components from all channels.
+            - ``umap_model`` (*umap.UMAP*): The trained UMAP model instance.
     """
     num_modes = sum(arg is not None for arg in [data, datasets, data_multivariate, decomposition])
     if num_modes != 1:
@@ -354,7 +322,8 @@ def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomp
     
     decomp_init_params = {
         'decomposition_method': decomposition_method,
-        'decomposition_max_n': decomposition_max_n
+        'decomposition_max_n': decomposition_max_n,
+        'decomposition_log_base': decomposition_log_base
     }
 
     if decomposition is not None:
@@ -364,12 +333,21 @@ def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomp
         instance = DecompositionUMAP(original_data=data, decomposition_func=decomposition_func, **decomp_init_params, **common_params)
         return instance.embed_map, instance.decomposition, instance.umap_model
     elif datasets is not None:
-        _decomposition_func = decomposition_func
-        if _decomposition_func is None:
-            def func(d):
+        base_decomp_func = decomposition_func
+        if base_decomp_func is None:
+            def build_func(d):
                 res = cdd_decomposition(d, max_n=decomposition_max_n)
                 return np.array(res[0] if isinstance(res, tuple) else res)
-            _decomposition_func = func
+            base_decomp_func = build_func
+        
+        _decomposition_func = base_decomp_func
+        if decomposition_log_base is not None:
+            def log_wrapper(d):
+                min_val = np.min(d); d_shifted = d + (-min_val + 1) if min_val <= 0 else d
+                log_data = np.log(d_shifted) / np.log(decomposition_log_base)
+                return base_decomp_func(log_data)
+            _decomposition_func = log_wrapper
+
         decompositions = [_decomposition_func(d) for d in datasets]
         merged_decomposition = np.concatenate(decompositions, axis=1)
         instance = DecompositionUMAP(decomposition=merged_decomposition, **common_params)
@@ -378,12 +356,21 @@ def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomp
         list_of_embed_maps = [list(embeds) for embeds in zip(*split_maps_by_comp)]
         return list_of_embed_maps, decompositions, instance.umap_model
     elif data_multivariate is not None:
-        _decomposition_func = decomposition_func
-        if _decomposition_func is None:
-            def func(d):
+        base_decomp_func = decomposition_func
+        if base_decomp_func is None:
+            def build_func(d):
                 res = cdd_decomposition(d, max_n=decomposition_max_n)
                 return np.array(res[0] if isinstance(res, tuple) else res)
-            _decomposition_func = func
+            base_decomp_func = build_func
+
+        _decomposition_func = base_decomp_func
+        if decomposition_log_base is not None:
+            def log_wrapper(d):
+                min_val = np.min(d); d_shifted = d + (-min_val + 1) if min_val <= 0 else d
+                log_data = np.log(d_shifted) / np.log(decomposition_log_base)
+                return base_decomp_func(log_data)
+            _decomposition_func = log_wrapper
+        
         decompositions_per_channel = [_decomposition_func(channel) for channel in data_multivariate]
         merged_decomposition = np.concatenate(decompositions_per_channel, axis=0)
         instance = DecompositionUMAP(decomposition=merged_decomposition, original_data=data_multivariate[0], **common_params)
@@ -393,38 +380,19 @@ def decompose_and_embed(data=None, datasets=None, data_multivariate=None, decomp
 def decompose_with_existing_model(model_filename,
                                   data=None, datasets=None, data_multivariate=None, decomposition=None,
                                   decomposition_method='cdd', decomposition_func=None,
-                                  norm_func=None, verbose=True,
-                                  decomposition_max_n=None):
+                                  decomposition_log_base=None, decomposition_max_n=None,
+                                  norm_func=None, verbose=True):
     """
     Applies a pre-trained UMAP model to new data using explicit, mutually exclusive modes.
 
     This is the primary high-level function for inference. It loads a saved UMAP
     model and uses it to project new data into the learned embedding space, ensuring
-    consistency with the original embedding. UMAP-specific training parameters
-    (like n_neighbors) are not needed as they are inherent to the loaded model.
+    consistency with the original embedding.
 
     Operating Modes
     ---------------
     The function operates in one of four modes, selected by providing exactly one
-    of the following keyword arguments:
-
-    1.  **`data=...` (Single Raw Dataset)**
-        -   **Input**: A single 2D NumPy array (or 1D time series).
-        -   **Behavior**: Decomposes the raw data and transforms it using the loaded model.
-
-    2.  **`datasets=...` (Multi-Dataset / Batch)**
-        -   **Input**: A list of 2D NumPy arrays.
-        -   **Behavior**: Decomposes each dataset, merges them, transforms the combined
-            data with the loaded model, and splits the result back into a list.
-
-    3.  **`data_multivariate=...` (Multivariate Raw Dataset)**
-        -   **Input**: A single 3D+ NumPy array (e.g., `(channels, height, width)`).
-        -   **Behavior**: Decomposes each channel, merges the components, and transforms
-            the combined feature set with the loaded model.
-
-    4.  **`decomposition=...` (Pre-computed Decomposition)**
-        -   **Input**: A single 3D+ NumPy array of pre-computed components.
-        -   **Behavior**: Skips decomposition and directly transforms the provided data.
+    of the following keyword arguments: `data`, `datasets`, `data_multivariate`, or `decomposition`.
 
     Args:
         model_filename (str): The path to the saved (pickled) UMAP model file.
@@ -436,22 +404,34 @@ def decompose_with_existing_model(model_filename,
             **Must be consistent** with the method used to train the model.
         decomposition_func (callable, optional): A custom decomposition function.
             **Must be consistent** with the one used during training.
+        decomposition_log_base (float, optional): The base for the log transformation.
+            **Must be consistent** with the value used during training.
+        decomposition_max_n (int, optional): Number of decomposition components.
+            **Must be consistent** with the value used during training.
         norm_func (callable, optional): The normalization function. **Must be consistent**
             with the one used during training. Defaults to None.
         verbose (bool, optional): If True, prints progress messages.
-        decomposition_max_n (int, optional): Number of decomposition components.
-            **Must be consistent** with the value used during training.
 
-    Returns:
-        tuple: The contents of the tuple depend on the operating mode:
-        - For `data` or `decomposition` mode: `(embed_map, final_decomposition)`
-        - For `datasets` mode: `(list_of_embed_maps, list_of_decompositions)`
-        - For `data_multivariate` mode: `(embed_map, merged_decomposition)`
+    Returns
+    -------
+    tuple
+        The contents of the tuple depend on the operating mode:
 
-    Raises:
-        ValueError: If more or less than one of `data`, `datasets`,
-            `data_multivariate`, or `decomposition` are provided.
-        FileNotFoundError: If the `model_filename` is not found.
+        - **For `data` or `decomposition` mode**:
+            - ``embed_map`` (*list[numpy.ndarray]*): The new embedding map for the input data.
+            - ``final_decomposition`` (*numpy.ndarray*): The decomposition of the new data.
+
+        - **For `datasets` mode**:
+            - ``list_of_embed_maps`` (*list[list[numpy.ndarray]]*): A list containing the
+              embedding map for each corresponding input dataset.
+            - ``list_of_decompositions`` (*list[numpy.ndarray]*): A list of the
+              decomposition components for each input dataset.
+
+        - **For `data_multivariate` mode**:
+            - ``embed_map`` (*list[numpy.ndarray]*): The new embedding map for the
+              multi-channel data.
+            - ``merged_decomposition`` (*numpy.ndarray*): The merged decomposition
+              from all channels.
     """
     num_modes = sum(arg is not None for arg in [data, datasets, data_multivariate, decomposition])
     if num_modes != 1:
@@ -461,9 +441,9 @@ def decompose_with_existing_model(model_filename,
     temp_instance.load_umap_model(model_filename)
     temp_instance.norm_func = norm_func
 
-    _decomposition_func = decomposition_func
-    if _decomposition_func is None:
-        def func(d):
+    base_decomp_func = decomposition_func
+    if base_decomp_func is None:
+        def build_func(d):
             if decomposition_method == 'cdd':
                 res = cdd_decomposition(d, max_n=decomposition_max_n)
             elif decomposition_method == 'emd':
@@ -472,7 +452,15 @@ def decompose_with_existing_model(model_filename,
             else:
                 raise ValueError(f"Unknown decomposition_method: {decomposition_method}")
             return np.array(res[0] if isinstance(res, tuple) else res)
-        _decomposition_func = func
+        base_decomp_func = build_func
+
+    _decomposition_func = base_decomp_func
+    if decomposition_log_base is not None:
+        def log_wrapper(d):
+            min_val = np.min(d); d_shifted = d + (-min_val + 1) if min_val <= 0 else d
+            log_data = np.log(d_shifted) / np.log(decomposition_log_base)
+            return base_decomp_func(log_data)
+        _decomposition_func = log_wrapper
     
     if decomposition is not None:
         embed_map = temp_instance.compute_new_embeddings(new_decomposition=decomposition)
