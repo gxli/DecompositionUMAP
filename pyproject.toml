@@ -1,5 +1,5 @@
 [project]
-name = "decomposition_umap"
+name = "decomposition-umap"
 version = "0.1.0"
 description = "A Python module for pattern classification and anomaly detection using UMAP dimensionality reduction embedding on decomposed data using Constrained Diffusion"
 readme = "ReadMe.rst"
@@ -10,7 +10,9 @@ license = { text = "GPLv3" }
 requires-python = ">=3.0"
 dependencies = [
     "numpy>=1.00",
-    "umap-learn>=0.4.0"
+    "umap-learn>=0.4.0",
+    "constrained-diffusion>=1.0.0",
+    "scikit-learn>=1.0.0"
     # "emd-signal>=1.0.0"
 ]
 
@@ -21,3 +23,11 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = { "decomposition_umap" = "src" }
 packages = ["decomposition_umap"]
+
+
+# --- ADD THIS NEW SECTION ---
+[project.scripts]
+# This line creates a command-line script named "decomp-umap".
+# When a user runs it, it will execute the "main" function
+# located in the "__main__.py" file of your "decomposition_umap" package.
+decomposition-umap = "decomposition_umap.__main__:main"

@@ -299,6 +299,41 @@ def cdd_decomposition(data, e_rel=3e-2, max_n=None, sm_mode='reflect'):
         # This is a fallback, though the ImportError should be caught first.
         raise RuntimeError("CDD library was marked as unavailable after a successful import check.")
 
+def wavelet_decomposition(data, e_rel=3e-2, max_n=None, sm_mode='reflect'):
+    """
+    Performs Constrained Diffusion Decomposition (CDD) on n-dimensional data by
+    calling the external `constrained-diffusion-decomposition` library.
+
+    Args:
+        data (numpy.ndarray): The n-dimensional input array.
+        e_rel (float, optional): Relative error, controlling accuracy vs. speed. Defaults to 3e-2.
+        max_n (int, optional): Maximum number of decomposition components (scales).
+            If None, it is calculated automatically based on the data size.
+        sm_mode (str, optional): The boundary mode for convolution. Defaults to 'reflect'.
+
+    Returns:
+        tuple: `(results, residual)` where `results` is a list of NumPy arrays
+        representing each scale and `residual` is the leftover coarsest scale.
+
+    Raises:
+        ImportError: If the `constrained-diffusion-decomposition` library is not installed.
+    """
+    # Check if the import at the top of the file was successful.
+    if not CDD_AVAILABLE:
+        # If not, raise a clear error message telling the user what to do.
+        raise ImportError(
+            "\nThe 'cdd' decomposition method requires the 'constrained-diffusion-decomposition' package.\n"
+            "Please install it with the command:\n\n"
+            "pip install constrained-diffusion-decomposition\n"
+        )
+    
+    # If the library is available, call it directly and return its result.
+    if 'cdd_external' in globals():
+        print("--- Using external 'constrained-diffusion-decomposition' library for CDD. ---")
+        return cdd_external.constrained_diffusion_decomposition(data, e_rel=e_rel, num_channels=max_n, sm_mode=sm_mode,constrained=False)
+    else:
+        # This is a fallback, though the ImportError should be caught first.
+        raise RuntimeError("CDD library was marked as unavailable after a successful import check.")
 
 def emd_decomposition(data, max_imf=-1):
     """
