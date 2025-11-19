@@ -203,44 +203,42 @@ The UMAP embedding can effectively separate the anomaly from the background.
 4. Command-Line Tool
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-This package includes a convenient command-line tool, `decomp-umap`, for quick analysis of FITS or NPY files. After installing the package, you can run it directly from your terminal.
+This package includes a convenient command-line tool, `decomposition-umap`, for quick analysis of FITS or NPY files. After installing the package, you can run it directly from your terminal.
 
 By default, the tool saves the output files in the same directory as the input file, prefixed with the input file's name. You can optionally specify a different output directory.
 
 **Usage:**
-
 .. code-block:: text
 
-    usage: decomp-umap [-h] [-o OUTPUT_DIR] [-d DECOMPOSITION_LEVEL] [-n {2,3}]
-                     [-m {cdd,emd}] [-p UMAP_PARAMS] [--no-verbose]
-                     input_file
+    usage: decomposition-umap [-h] [-o OUTPUT_DIR] [-d DECOMPOSITION_LEVEL] [-n {2,3}]
+                              [-m {cdd,emd}] [-p UMAP_PARAMS] [--no-verbose]
+                              input_file
 
 **Examples:**
 
-1.  **Basic Analysis (Default Output Path)**: Process a FITS file with default settings. The output files (e.g., `my_image_decomposition.npy`) will be saved in the same directory as `my_image.fits`.
+1. **Basic Analysis (Default Output Path)**: Process a FITS file with default settings. The output files (e.g., `my_image_decomposition.npy`) will be saved in the same directory as `my_image.fits`.
+.. code-block:: bash
 
-    .. code-block:: bash
+    decomposition-umap path/to/my_image.fits
 
-        decomp-umap path/to/my_image.fits
+2. **Specifying an Output Directory**: Process a file and save the results into a specific folder named `analysis_results`.
+.. code-block:: bash
 
-2.  **Specifying an Output Directory**: Process a file and save the results into a specific folder named `analysis_results`.
+    decomposition-umap path/to/my_image.fits -o analysis_results/
 
-    .. code-block:: bash
+3. **3D Embedding and Custom Decomposition**: Process a NumPy file, use exactly 8 decomposition components, and create a 3D UMAP embedding.
+.. code-block:: bash
 
-        decomp-umap path/to/my_image.fits -o analysis_results/
+    decomposition-umap my_data.npy -o results/ -d 8 -n 3
 
-3.  **3D Embedding and Custom Decomposition**: Process a NumPy file, use exactly 8 decomposition components, and create a 3D UMAP embedding.
+4. **Advanced UMAP Control**: Use the `--umap_params` flag to pass a JSON string of advanced parameters, such as enabling UMAP's `low_memory` mode.
+.. code-block:: bash
 
-    .. code-block:: bash
+    decomposition-umap large_image.fits -o results/ -d 10 -p '{"n_neighbors":
+    50, "low_memory": true}'
+    
 
-        decomp-umap my_data.npy -o results/ -d 8 -n 3
 
-4.  **Advanced UMAP Control**: Use the `--umap_params` flag to pass a JSON string of advanced parameters, such as enabling UMAP's `low_memory` mode.
-
-    .. code-block:: bash
-
-        decomp-umap large_image.fits -o results/ -d 10 -p '{"n_neighbors": 50, "low_memory": true}'
 
 API Reference
 -------------
