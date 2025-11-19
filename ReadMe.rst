@@ -1,33 +1,43 @@
-===============================================================================================
+================================================================================
 Decomposition-UMAP: A framework for pattern classification and anomaly detection
-===============================================================================================
+================================================================================
 
-.. .. image:: https://img.shields.io/pypi/v/decomposition-umap.svg
-..         :target: https://pypi.python.org/pypi/decomposition-umap
-..         :alt: PyPI Version
+.. image:: https://img.shields.io/pypi/v/decomposition-umap.svg
+   :target: https://pypi.org/project/decomposition-umap/0.1.0
+   :alt: PyPI Version
 
 .. .. image:: https://img.shields.io/travis/gxli/DecompositionUMAP.svg
-..         :target: https://travis-ci.org/gxli/DecompositionUMAP
-..         :alt: Build Status
+..    :target: https://travis-ci.org/gxli/DecompositionUMAP
+..    :alt: Build Status
 
+.. image:: images/logo.png
+   :alt: Project Logo
+   :width: 200px
+   :align: center
+
+------------------------
 Decomposition-UMAP
-==================
-Decomposition-UMAP is a general-purpose framework for pattern classification and anomaly detection. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm.
+------------------------
 
-Abstract
---------
+.. image:: images/decomposition-umap_workflow.png
+   :width: 100%
+   :align: center
+   :alt: Decomposition-UMAP workflow
+
+Decomposition-UMAP is a general-purpose framework for pattern classification and anomaly detection. The methodology involves a two-stage process: first, the application of a multiscale decomposition technique, followed by a non-linear dimension reduction using the Uniform Manifold Approximation and Projection (UMAP) algorithm.
 
 This software provides a structured implementation for analyzing numerical data by combining signal and image decomposition with manifold learning. The primary workflow involves decomposing an input dataset into a set of components, which serve as a high-dimensional feature vector for each point in the original data. Subsequently, the UMAP algorithm is employed to project these features into a lower-dimensional space. This process is designed to facilitate the analysis of data where features may be present across multiple scales or frequencies, enabling the separation of structured signals from noise.
 
-Functionality
--------------
-
-*   **Flexible API with Explicit Modes**: Provides a high-level API that
-    supports single datasets, single dataset with use-supplied decomposition function and pre-computed decompositions.
-*   **Powerful Decomposition Techniques**: Includes interfaces for methods like Constrained Diffusion Decomposition (CDD) and Empirical Mode Decomposition (EMD).
-*   **Full UMAP Control**: Allows for complete control over the UMAP algorithm's parameters via convenience arguments and a flexible dictionary (`umap_params`).
-*   **Support for Custom Functions**: Users can supply their own decomposition functions for maximum extensibility.
-*   **Serialization of Models**: Trained UMAP models can be saved using `pickle` and reloaded for consistent inference on new data.
+.. Functionality
+.. -------------
+.. *   **Flexible API with Explicit Modes**: Provides a high-level API that
+..     supports single datasets, single dataset with use-supplied decomposition function and pre-computed decompositions.
+.. *   **Powerful Decomposition Techniques**: Includes interfaces for methods like
+..     Constrained Diffusion Decomposition (cdd) and Empirical Mode Decomposition
+..     (EMD), and Wavelet Decomposition (Wavelet).
+.. *   **Full UMAP Control**: Allows for complete control over the UMAP algorithm's parameters via convenience arguments and a flexible dictionary (`umap_params`).
+.. *   **Support for Custom Functions**: Users can supply their own decomposition functions for maximum extensibility.
+.. *   **Serialization of Models**: Trained UMAP models can be saved using `pickle` and reloaded for consistent inference on new data.
 
 Installation
 ------------
@@ -36,15 +46,15 @@ The required Python packages must be installed prior to use. It is recommended t
 
 .. code-block:: bash
 
-    pip install numpy umap-learn scipy matplotlib
+    pip install numpy umap-learn scipy matplotlib constrained-diffusion
 
 and install 
 
 Decomposition-UMAP via pip:
 
 .. code-block:: bash
-
-    pip install decomposition-umap
+    
+    pip install decomposition-umap==0.1.0
 
 or clone the repository and install it manually:
 
@@ -190,8 +200,51 @@ The UMAP embedding can effectively separate the anomaly from the background.
     plt.show()
 
 
+4. Command-Line Tool
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+This package includes a convenient command-line tool, `decomp-umap`, for quick analysis of FITS or NPY files. After installing the package, you can run it directly from your terminal.
+
+By default, the tool saves the output files in the same directory as the input file, prefixed with the input file's name. You can optionally specify a different output directory.
+
+**Usage:**
+
+.. code-block:: text
+
+    usage: decomp-umap [-h] [-o OUTPUT_DIR] [-d DECOMPOSITION_LEVEL] [-n {2,3}]
+                     [-m {cdd,emd}] [-p UMAP_PARAMS] [--no-verbose]
+                     input_file
+
+**Examples:**
+
+1.  **Basic Analysis (Default Output Path)**: Process a FITS file with default settings. The output files (e.g., `my_image_decomposition.npy`) will be saved in the same directory as `my_image.fits`.
+
+    .. code-block:: bash
+
+        decomp-umap path/to/my_image.fits
+
+2.  **Specifying an Output Directory**: Process a file and save the results into a specific folder named `analysis_results`.
+
+    .. code-block:: bash
+
+        decomp-umap path/to/my_image.fits -o analysis_results/
+
+3.  **3D Embedding and Custom Decomposition**: Process a NumPy file, use exactly 8 decomposition components, and create a 3D UMAP embedding.
+
+    .. code-block:: bash
+
+        decomp-umap my_data.npy -o results/ -d 8 -n 3
+
+4.  **Advanced UMAP Control**: Use the `--umap_params` flag to pass a JSON string of advanced parameters, such as enabling UMAP's `low_memory` mode.
+
+    .. code-block:: bash
+
+        decomp-umap large_image.fits -o results/ -d 10 -p '{"n_neighbors": 50, "low_memory": true}'
+
 API Reference
 -------------
+
 
 **`decompose_and_embed(...)`**
 
@@ -201,15 +254,20 @@ The primary function for **training** a new Decomposition-UMAP model. It intelli
 
     *   `data` (`numpy.ndarray`): For a single raw dataset.
 
+    *   `datasets` (`list`): For a batch of raw datasets.
+
+    *   `data_multivariate` (`numpy.ndarray`): For a multi-channel raw dataset.
+
     *   `decomposition` (`numpy.ndarray`): For a single pre-computed decomposition.
 
 *   **Key Parameters**:
 
-    *   `decomposition_method` (`str`): The name of the built-in decomposition method (e.g., `'cdd'`).
+
+      *   `decomposition_method` (`str`): The name of the built-in decomposition method (e.g., `'cdd'`, `'emd'`, `'wavelet'`). Ignored if `decomposition` is provided.
 
     *   `decomposition_max_n` (`int`): The number of components to generate for relevant decomposition methods.
 
-    *   `decomposition_func` (`callable`): A user-provided decomposition function, which overrides `decomposition_method`.
+    *   `decomposition_func` (`callable`): A user-provided decomposition function, which overrides `decomposition_method`. Ignored if `decomposition` is provided.
 
     *   `n_component` (`int`): The target dimension for the final UMAP embedding.
 
@@ -221,9 +279,9 @@ The primary function for **training** a new Decomposition-UMAP model. It intelli
 
     *   `low_memory` (`bool`): Convenience argument for UMAP's `low_memory` flag.
 
-    *   `umap_params` (`dict`): For advanced control, a dictionary of arguments passed directly to the `umap.UMAP` constructor.
+    *   `umap_params` (`dict`): For advanced control, a dictionary of arguments passed directly to the `umap.UMAP` constructor (e.g., `{'min_dist': 0.0, 'metric': 'cosine'}`).
 
-*   **Returns**: A tuple `(embed_map, decomposition, umap_model)`.
+*   **Returns**: A tuple whose contents depend on the operating mode. For single dataset modes, it returns `(embed_map, decomposition, umap_model)`.
 
 **`decompose_with_existing_model(...)`**
 
@@ -232,6 +290,10 @@ The primary function for **inference**. It applies a pre-trained UMAP model to n
 *   **Operating Modes (provide exactly one)**:
 
     *   `data` (`numpy.ndarray`): For a single raw dataset.
+
+    *   `datasets` (`list`): For a batch of raw datasets.
+
+    *   `data_multivariate` (`numpy.ndarray`): For a multi-channel raw dataset.
 
     *   `decomposition` (`numpy.ndarray`): For a single pre-computed decomposition.
 
@@ -245,7 +307,7 @@ The primary function for **inference**. It applies a pre-trained UMAP model to n
 
     *   `norm_func` (`callable`): The normalization function, which **must be consistent** with the one used during training.
 
-*   **Returns**: A tuple `(embed_map, final_decomposition)`.
+*   **Returns**: A tuple whose contents depend on the operating mode. For single dataset modes, it returns `(embed_map, final_decomposition)`.
 
 
 **`DecompositionUMAP` class**
@@ -254,13 +316,13 @@ The core engine that encapsulates the workflow state. It offers granular control
 
 *   **Initialization Options**:
 
-    The class is initialized in one of two ways:
+    The class is initialized in one of three ways:
 
-    1.  **With Raw Data**: Provide ``original_data`` and decomposition settings (like ``decomposition_method``). This is the standard training workflow.
+    1.  **With Raw Data & Built-in Method**: Provide ``original_data`` and use ``decomposition_method`` to specify a built-in function.
 
         .. code-block:: python
 
-            # Initialize by providing raw data and decomposition settings
+            # Initialize by providing raw data and a method name
             instance = DecompositionUMAP(
                 original_data=data,
                 decomposition_method='cdd',
@@ -269,7 +331,25 @@ The core engine that encapsulates the workflow state. It offers granular control
             )
             # instance.umap_model is now a trained model.
 
-    2.  **With a Pre-computed Decomposition**: Provide a ``decomposition``. This skips the decomposition step and is useful for reusing computationally expensive decompositions.
+    2.  **With Raw Data & Custom Function**: Provide ``original_data`` and your own ``decomposition_func``.
+
+        .. code-block:: python
+
+            from scipy.ndimage import gaussian_filter
+
+            def my_custom_decomposition(data):
+                comp1 = gaussian_filter(data, sigma=3)
+                comp2 = data - comp1
+                return np.array([comp1, comp2])
+
+            # Initialize with the custom function
+            instance = DecompositionUMAP(
+                original_data=data,
+                decomposition_func=my_custom_decomposition,
+                n_component=2
+            )
+
+    3.  **With a Pre-computed Decomposition**: Provide a ``decomposition`` array directly. This skips the decomposition step.
 
         .. code-block:: python
 
